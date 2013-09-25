@@ -378,6 +378,60 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 	return true;
 }
 
+bool SaveAlgebraicVectorComponent(const AlgebraicVector& av, const char* filename,
+						 	 	  int numComponents, int pickedComponent)
+{
+	if(numComponents <= 0){
+		cout << "ERROR -- Bad number of components specified!\n";
+		return false;
+	}
+
+	if((pickedComponent < 0) || (pickedComponent >= numComponents)){
+		cout << "ERROR -- Bad component picked. Only " << numComponents
+			 << " components are available\n";
+		return false;
+	}
+
+	cout << "INFO -- saving vector-component to " << filename << endl;
+
+	if(av.data.size() != av.positions.size()){
+		cout << "ERROR -- Invalid algebra vector - data and position size does not match."
+			 << " During write to " << filename << endl;
+		return false;
+	}
+
+	ofstream out(filename);
+	if(!out){
+		cout << "ERROR -- File can not be opened for write: " << filename << endl;
+		return false;
+	}
+
+	out << int(1) << endl;
+	out << av.worldDim << endl;
+	out << av.positions.size() / numComponents << endl;
+
+	for(size_t i = pickedComponent; i < av.positions.size(); i += numComponents){
+		switch(av.worldDim){
+			case 1:	out << av.positions[i].x << endl; break;
+			case 2:	out << av.positions[i].x << " " << av.positions[i].y << endl; break;
+			case 3:	out << av.positions[i].x << " " << av.positions[i].y << " " << av.positions[i].z << endl; break;
+			default:
+				cout << "ERROR -- Unsupported world-dimension (" << av.worldDim
+					 << ") during write: " << filename << endl;
+				return false;
+		}
+	}
+
+	out << int(1) << endl;
+
+	for(size_t i = pickedComponent; i < av.data.size(); i += numComponents){
+		int ind = int(i / numComponents);
+		out << ind << " " << ind << " " << av.data[i] << endl;
+	}
+
+	return true;
+}
+
 /*
 int oldMain(int argc, char** argv)
 {
@@ -504,15 +558,15 @@ int main(int argc, char** argv)
 	ParamToString(&in2, "-i2", argc, argv);
 	ParamToString(&outFile, "-o", argc, argv);
 	
-	bool makeCons = FindParam("-makeCons", argc, argv);
-	int numComponents = ParamToInt("-components", argc, argv, 1);
+	bool makeCons = FindParam("-makecons", argc, argv);
+	int numComponents = ParamToInt("-comps", argc, argv, 1);
 
 	if(makeCons)
-		cout << "make consistent (-makeCons):        active" << endl;
+		cout << "make consistent (-makecons):        active" << endl;
 	else
-		cout << "make consistent (-makeCons):        inactive" << endl;
+		cout << "make consistent (-makecons):        inactive" << endl;
 		
-	cout << "num components (-components n):     " << numComponents << endl;
+	cout << "num components (-comps n):     " << numComponents << endl;
 	
 	string command;
 	if(argc > 1)
@@ -550,11 +604,24 @@ int main(int argc, char** argv)
 			cout << "max: " << av.data[av.index_with_max_value()]
 				 << ", at: " << av.positions[av.index_with_max_value()] << endl;
 		}
+		else if(command.find("pickcomponent") == 0){
+			CHECK(in1 && outFile, "Files -i1 and -o have to be specified for pickcomponent.");
+			CHECK(FindParam("-comp", argc, argv),
+				"Make sure to specify the component that shall be picked through '-comp'\n");
+			CHECK(FindParam("-comps", argc, argv),
+				"Make sure to specify the number of components of the loaded vector through '-comps'\n");
+			int pickedComponent = ParamToInt("-comp", argc, argv, 0);
+
+			AlgebraicVector av;
+			LoadVector(av, in1, makeCons, numComponents);
+			SaveAlgebraicVectorComponent(av, outFile, numComponents, pickedComponent);
+		}
 		else{
 			cout << "Invalid command. Please specify one of the following commands as first parameter: " << endl;
 			cout << "  combine: Loads a parallel vector and combines all parts to a serial one" << endl;
 			cout << "  dif: Subtracts the second vector from the first and writes the result to a file." << endl;
 			cout << "  minmax: Prints the minimal and maximal value of a vector" << endl;
+			cout << "  pickcomponent: Loads a vector, removes all components except for the specified one, and saves it." << endl;
 		}
 	}
 	catch(...){
