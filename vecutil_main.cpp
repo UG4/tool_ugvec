@@ -676,7 +676,7 @@ int main(int argc, char** argv)
 			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
 			cout << "                    to be in additive storage mode." << endl << endl;
 
-			cout << "  -numComponents n: If more than one component is stored in a vector, this has to" << endl;
+			cout << "  -components n:    If more than one component is stored in a vector, this has to" << endl;
 			cout << "                    be indicated through this option. The option takes an additional" << endl;
 			cout << "                    integer value 'n' that specifies the number of components." << endl << endl;
 
