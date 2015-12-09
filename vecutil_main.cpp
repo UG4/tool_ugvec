@@ -1,16 +1,17 @@
 //	created by Sebastian Reiter
 //	s.b.reiter@gmail.com
 //	Feb. 2013
-
+#include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <vector>
 #include <cmath>
 #include <cassert>
 #include <string>
 #include <sstream>
+#include <cstring>
 #include <map>
-#include "parameter_util.h"
 
 using namespace std;
 
@@ -32,6 +33,31 @@ struct Position{
 		return (fabs(x-p.x) < SMALL) && (fabs(y-p.y) < SMALL)
 				 && (fabs(z-p.z) < SMALL) && (ci == p.ci);
 	}
+
+	bool operator < (const Position& p) const
+	{
+		const bool cEqual = ci == p.ci;
+		const bool xEqual = fabs(x-p.x) < SMALL;
+		const bool yEqual = fabs(y-p.y) < SMALL;
+		const bool zEqual = fabs(z-p.z) < SMALL;
+
+		if(cEqual){
+			if(xEqual){
+				if(yEqual){
+					if(zEqual)
+						return false;
+					else
+						return z < p.z;
+				}
+				else
+					return y < p.y;
+			}
+			else
+				return x < p.x;
+		}
+		else
+			return ci < p.ci;
+	}
 	
 	number x, y, z;
 	int ci;			///< component index
@@ -45,7 +71,7 @@ ostream& operator << (ostream& out, const Position& p)
 
 
 struct AlgebraicVector{
-	AlgebraicVector() : worldDim(0)	{}
+	AlgebraicVector() : worldDim(0), numComponents(1)	{}
 	
 ///	adds values with same positions and inserts the others
 /**	returns a reference to this vector, so that add_vector can be chained.*/
@@ -69,6 +95,7 @@ struct AlgebraicVector{
 	int index_with_min_value() const;
 	
 	int	worldDim;
+	int numComponents;
 	vector<Position> positions;
 	vector<number>	 data;
 };
@@ -96,20 +123,20 @@ add_vector(const AlgebraicVector& av)
 		}
 	}
 	
+	typedef map<Position, size_t>	PosMap;
+	PosMap	posMap;
+	for(size_t i = 0; i < positions.size(); ++i)
+		posMap[positions[i]] = i;
+
 	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
 		const Position& p_av = av.positions[i_av];
-		bool gotOne = false;
-		for(size_t i = 0; i < positions.size(); ++i){
-			if(p_av == positions[i]){
-				gotOne = true;
-				data[i] += av.data[i_av];
-				break;
-			}
-		}
-			
-		if(!gotOne){
+		PosMap::iterator piter = posMap.find(p_av);
+		if(piter == posMap.end()){
 			positions.push_back(p_av);
 			data.push_back(av.data[i_av]);
+		}
+		else{
+			data[piter->second] += av.data[i_av];
 		}
 	}
 	
@@ -121,7 +148,7 @@ unite_with_vector(const AlgebraicVector& av)
 {
 //todo:	Improve performance!!!
 //	iterate over all entries of av. If the position matches with an entry of
-//	this vector, then add the values. If not, insert the value and its position
+//	this vector, then ignore the values. If not, insert the value and its position
 //	into this vector.
 	
 	assert(av.positions.size() == av.data.size());
@@ -138,22 +165,21 @@ unite_with_vector(const AlgebraicVector& av)
 		}
 	}
 	
+	typedef map<Position, size_t>	PosMap;
+	PosMap	posMap;
+	for(size_t i = 0; i < positions.size(); ++i)
+		posMap[positions[i]] = i;
+
+
 	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
 		const Position& p_av = av.positions[i_av];
-		bool gotOne = false;
-		for(size_t i = 0; i < positions.size(); ++i){
-			if(p_av == positions[i]){
-				gotOne = true;
-				break;
-			}
-		}
-			
-		if(!gotOne){
+		PosMap::iterator piter = posMap.find(p_av);
+		if(piter == posMap.end()){
 			positions.push_back(p_av);
 			data.push_back(av.data[i_av]);
 		}
 	}
-	
+
 	return *this;
 }
 
@@ -190,7 +216,6 @@ index_with_max_value() const
 	return maxInd;
 }
 
-///	returns the first index at which the minimum can be found
 int AlgebraicVector::
 index_with_min_value() const
 {
@@ -205,8 +230,6 @@ index_with_min_value() const
 	
 	return minInd;
 }
-
-
 	
 	
 bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numComponents)
@@ -235,7 +258,7 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 	av.positions.resize(numEntries);
 	av.data.clear();
 	av.data.resize(numEntries, 0);
-	
+	av.numComponents = numComponents;
 	
 	for(int i = 0; i < numEntries; ++i){
 		switch(av.worldDim){
@@ -250,7 +273,7 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 		av.positions[i].ci = (i % numComponents);
 	}
 	
-	
+
 	int someVal;
 	in >> someVal;
 
@@ -260,11 +283,12 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 		return false;
 	}
 
-	
+
+	size_t numNANs = 0;
 	for(int i = 0; i < numEntries; ++i){
 		int ind1, ind2;
-		number val;
-		in >> ind1 >> ind2 >> val;
+		string valstr;
+		in >> ind1 >> ind2 >> valstr;
 		if(ind1 != ind2){
 			cout << "ERROR -- Only connections to self are supported! In File: "
 				 << filename << endl;
@@ -273,8 +297,14 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 		if((ind1 < 0) || (ind1 >= numEntries)){
 			cout << "ERROR -- Bad index: " << ind1 << ". In File: " << filename << endl;
 		}
-		av.data[ind1] = val;
+
+		if(valstr.find('n') != string::npos or valstr.find('N') != string::npos)
+			++numNANs;
+		av.data[ind1] = atof(valstr.c_str());
 	}
+
+	if(numNANs > 0)
+		cout << "  -> WARNING: vector contains " << numNANs << " 'nan' entries!" << endl;
 	
 	return true;
 }
@@ -302,6 +332,8 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 		return false;
 	}
 	
+	av.numComponents = numComponents;
+
 	int numFiles;
 	inParallel >> numFiles;
 	
@@ -378,195 +410,197 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 	return true;
 }
 
-bool SaveAlgebraicVectorComponent(const AlgebraicVector& av, const char* filename,
-						 	 	  int numComponents, int pickedComponent)
+
+void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
+					 int numSections, bool absoluteValues)
 {
-	if(numComponents <= 0){
-		cout << "ERROR -- Bad number of components specified!\n";
-		return false;
+	CHECK(numSections > 0, "Invalid number of sections provided: " << numSections);
+
+	number minVal = numeric_limits<number>::max();
+	number maxVal = numeric_limits<number>::min();
+
+	if(absoluteValues){
+		for(size_t i = 0; i < av.data.size(); ++i){
+			minVal = min(minVal, fabs(av.data[i]));
+			maxVal = max(maxVal, fabs(av.data[i]));
+		}
+	}
+	else{
+		for(size_t i = 0; i < av.data.size(); ++i){
+			minVal = min(minVal, av.data[i]);
+			maxVal = max(maxVal, av.data[i]);
+		}
 	}
 
-	if((pickedComponent < 0) || (pickedComponent >= numComponents)){
-		cout << "ERROR -- Bad component picked. Only " << numComponents
-			 << " components are available\n";
-		return false;
+	number range = maxVal - minVal;
+	if(range <= 0){
+		histOut.resize(av.data.size(), 0);
+		return;
 	}
 
-	cout << "INFO -- saving vector-component to " << filename << endl;
+	histOut.resize(av.data.size());
+	vector<int> numEntriesPerSection(numSections, 0);
 
+	if(absoluteValues){
+		for(size_t i = 0; i < av.data.size(); ++i){
+			int section = (int)((number)numSections * (fabs(av.data[i]) - minVal) / range);
+			if(section < 0) section = 0;
+			if(section >= numSections) section = numSections - 1;
+			histOut[i] = section;
+			++numEntriesPerSection[section];
+		}
+	}
+	else{
+		for(size_t i = 0; i < av.data.size(); ++i){
+			int section = (int)((number)numSections * (av.data[i] - minVal) / range);
+			if(section < 0) section = 0;
+			if(section >= numSections) section = numSections - 1;
+			histOut[i] = section;
+			++numEntriesPerSection[section];
+		}
+	}
+
+	cout << "Histogram Created:" << endl;
+	for(int isec = 0; isec < numSections; ++isec){
+		cout << "section " << isec << ":\t";
+		cout << minVal + (number)isec * range / (number)numSections;
+		cout << " - ";
+		cout << minVal + (number)(isec+1) * range / (number)numSections;
+		cout << ":\t" << numEntriesPerSection[isec] << " entries." << endl;
+	}
+}
+
+
+bool SaveHistogramToUGX(const AlgebraicVector& av, const char* filename,
+						int numSections, bool absoluteValues)
+{
+	cout << "INFO -- saving histogram to " << filename << endl;
+	
 	if(av.data.size() != av.positions.size()){
 		cout << "ERROR -- Invalid algebra vector - data and position size does not match."
 			 << " During write to " << filename << endl;
 		return false;
 	}
-
+	
 	ofstream out(filename);
 	if(!out){
 		cout << "ERROR -- File can not be opened for write: " << filename << endl;
 		return false;
 	}
 
-	out << int(1) << endl;
-	out << av.worldDim << endl;
-	out << av.positions.size() / numComponents << endl;
-
-	for(size_t i = pickedComponent; i < av.positions.size(); i += numComponents){
+	out << "<?xml version=\"1.0\" encoding=\"utf-8\"?>" << endl;
+	out << "<grid name=\"defGrid\">" << endl;
+	out << "<vertices coords=\"" << av.worldDim << "\">";
+	
+	for(size_t i = 0; i < av.positions.size(); ++i){
 		switch(av.worldDim){
-			case 1:	out << av.positions[i].x << endl; break;
-			case 2:	out << av.positions[i].x << " " << av.positions[i].y << endl; break;
-			case 3:	out << av.positions[i].x << " " << av.positions[i].y << " " << av.positions[i].z << endl; break;
+			case 1:	out << av.positions[i].x; break;
+			case 2:	out << av.positions[i].x << " " << av.positions[i].y; break;
+			case 3:	out << av.positions[i].x << " " << av.positions[i].y << " " << av.positions[i].z; break;
 			default:
 				cout << "ERROR -- Unsupported world-dimension (" << av.worldDim
 					 << ") during write: " << filename << endl;
 				return false;
 		}
+
+		if(i + 1 < av.positions.size())
+			out << " ";
 	}
 
-	out << int(1) << endl;
+	out << "</vertices>" << endl;
 
-	for(size_t i = pickedComponent; i < av.data.size(); i += numComponents){
-		int ind = int(i / numComponents);
-		out << ind << " " << ind << " " << av.data[i] << endl;
+	vector<int> hist;
+	CreateHistogram(hist, av, numSections, absoluteValues);
+	
+	out << "<subset_handler name=\"defSH\">" << endl;
+	for(int isec = 0; isec < numSections; ++isec){
+		number ia = 0;
+		if(numSections > 1)
+			ia = (number)isec / (number)(numSections-1);
+		number r = max<number>(0, -1 + 2 * ia);
+		number g = 1. - fabs(2 * (ia - 0.5));
+		number b = max<number>(0, 1. - 2 * ia);
+
+		out << "<subset name=\"section " << isec
+			<< "\" color=\"" << r << " " << g << " " << b << " 1\">" << endl;
+
+		out << "<vertices>";
+		for(size_t i = 0; i < hist.size(); ++i){
+			if(hist[i] == isec){
+				out << " " << int(i);
+			}
+		}
+		out << "</vertices>" << endl;
+		out << "</subset>" << endl;
 	}
-
+	out << "</subset_handler>" << endl;
+	out << "</grid>" << endl;
+	
 	return true;
 }
 
-/*
-int oldMain(int argc, char** argv)
-{
-	string command;
-	if(argc > 1)
-		command = argv[1];
-		
-	if(command.find("make_consistent") == 0){
-		if(argc != 4){
-			cout << "ERROR: An infile and an outfile have to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av;
-			LoadParallelVector(av, argv[2], true);
-			SaveAlgebraicVector(av, argv[3]);
-		}
-	}
-	else if(command.find("unite") == 0){
-		if(argc != 4){
-			cout << "ERROR: An infile and an outfile have to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av;
-			LoadParallelVector(av, argv[2], false);
-			SaveAlgebraicVector(av, argv[3]);
-		}
-	}
-	else if(command.find("difference") == 0){
-		if(argc != 5){
-			cout << "ERROR: Two infiles and an outfile have to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av1, av2;
-			LoadAlgebraicVector(av1, argv[2]);
-			LoadAlgebraicVector(av2, argv[3]);
-			av1.subtract_vector(av2);
-			SaveAlgebraicVector(av1, argv[4]);
-			
-			if(!av1.data.empty()){
-				cout << "min: " << av1.data[av1.index_with_min_value()]
-					 << ", at: " << av1.positions[av1.index_with_min_value()] << endl;
-				cout << "max: " << av1.data[av1.index_with_max_value()]
-					 << ", at: " << av1.positions[av1.index_with_max_value()] << endl;
-			}
-		}
-	}
-	else if(command.find("consdiff") == 0){
-		if(argc != 5){
-			cout << "ERROR: Two infiles and an outfile have to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av1, av2;
-			LoadVector(av1, argv[2], true);
-			LoadVector(av2, argv[3], true);
-			av1.subtract_vector(av2);
-			SaveAlgebraicVector(av1, argv[4]);
-			
-			if(!av1.data.empty()){
-				cout << "min: " << av1.data[av1.index_with_min_value()]
-					 << ", at: " << av1.positions[av1.index_with_min_value()] << endl;
-				cout << "max: " << av1.data[av1.index_with_max_value()]
-					 << ", at: " << av1.positions[av1.index_with_max_value()] << endl;
-			}
-		}
-	}
-	else if(command.find("unitediff") == 0){
-		if(argc != 5){
-			cout << "ERROR: Two infiles and an outfile have to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av1, av2;
-			LoadVector(av1, argv[2], false);
-			LoadVector(av2, argv[3], false);
-			av1.subtract_vector(av2);
-			SaveAlgebraicVector(av1, argv[4]);
-			
-			if(!av1.data.empty()){
-				cout << "min: " << av1.data[av1.index_with_min_value()]
-					 << ", at: " << av1.positions[av1.index_with_min_value()] << endl;
-				cout << "max: " << av1.data[av1.index_with_max_value()]
-					 << ", at: " << av1.positions[av1.index_with_max_value()] << endl;
-			}
-		}
-	}
-	else if(command.find("minmax") == 0){
-		if(argc != 3){
-			cout << "ERROR: An infile has to be specified!" << endl;
-		}
-		else{
-			AlgebraicVector av;
-			LoadAlgebraicVector(av, argv[2]);
-			cout << "min: " << av.data[av.index_with_min_value()]
-					 << ", at: " << av.positions[av.index_with_min_value()] << endl;
-			cout << "max: " << av.data[av.index_with_max_value()]
-				 << ", at: " << av.positions[av.index_with_max_value()] << endl;
-		}
-	}
-	else{
-		cout << "Invalid command. Please specify one of the following commands: " << endl;
-		cout << "  make_consistent: Loads a parallel vector and unites it to a serial one" << endl;
-		cout << "                   by summing up values with the same positions." << endl;
-		cout << "  unite: Loads a parallel consistent vector and unites it to a serial one" << endl;
-		cout << "         by simply inserting values in one large vector." << endl;
-		cout << "  difference: Subtracts the second vector from the first and writes" << endl;
-		cout << "              the result to a file." << endl;
-		cout << "  consdiff: Subtracts the second vector from the first and writes" << endl;
-		cout << "              the result to a file. Parallel vectors are made consistent before diff." << endl;
-		cout << "  unitediff: Subtracts the second vector from the first and writes" << endl;
-		cout << "              the result to a file. Parallel vectors are united before diff." << endl;
-		cout << "  minmax: Prints the minimal and maximal value of a vector" << endl;
-	}
-	
-	return 0;
-}
-*/
 
 int main(int argc, char** argv)
 {
-	const char* in1 = NULL;
-	const char* in2 = NULL;
-	const char* outFile = NULL;
+	int		defHistoSecs = 5;
 
-	ParamToString(&in1, "-i1", argc, argv);
-	ParamToString(&in2, "-i2", argc, argv);
-	ParamToString(&outFile, "-o", argc, argv);
-	
-	bool makeCons = FindParam("-makecons", argc, argv);
-	int numComponents = ParamToInt("-comps", argc, argv, 1);
+	bool	makeCons 		= true;
+	int		numComponents	= 1;
+	int		histoSecs		= defHistoSecs;
+	int		histoAbs		= false;
 
-	if(makeCons)
-		cout << "make consistent (-makecons):        active" << endl;
-	else
-		cout << "make consistent (-makecons):        inactive" << endl;
-		
-	cout << "num components (-comps n):     " << numComponents << endl;
+	static const int maxNumFiles = 3;
+	const char* file[maxNumFiles];
+	int numFiles = 0;
+
+	for(int i = 2; i < argc; ++i){
+		if(argv[i][0] == '-'){
+			if(strcmp(argv[i], "-consistent") == 0){
+				makeCons = false;
+			}
+
+			else if(strcmp(argv[i], "-components") == 0){
+				if(i + 1 < argc){
+					numComponents = atoi(argv[i+1]);
+					++i;
+				}
+				else{
+					cout << "Invalid use of '-components': An integer value has to be supplied." << endl;
+					return 1;
+				}
+			}
+
+			else if(strcmp(argv[i], "-histoSecs") == 0){
+				if(i + 1 < argc){
+					histoSecs = atoi(argv[i+1]);
+					++i;
+				}
+				else{
+					cout << "Invalid use of '-histoSecs': An integer value has to be supplied." << endl;
+					return 1;
+				}
+			}
+
+			else if(strcmp(argv[i], "-histoAbs") == 0){
+				histoAbs = true;
+			}
+
+			else{
+				cout << "Invalid option supplied: " << argv[i] << endl;
+				return 1;
+			}
+		}
+
+		else if(numFiles < maxNumFiles){
+			file[numFiles] = argv[i];
+			++numFiles;
+		}
+
+		else{
+			cout << "Can't interpret parameter " << argv[i] << ": Too many parameters specified." << endl;
+			return 1;
+		}
+	}
 	
 	string command;
 	if(argc > 1)
@@ -575,18 +609,18 @@ int main(int argc, char** argv)
 
 	try{
 		if(command.find("combine") == 0){
-			CHECK(in1 && outFile, "Files -i1 and -o have to be specified for combine.");
+			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, in1, makeCons, numComponents);
-			SaveAlgebraicVector(av, outFile);
+			LoadVector(av, file[0], makeCons, numComponents);
+			SaveAlgebraicVector(av, file[1]);
 		}
 		else if(command.find("dif") == 0){
-			CHECK(in1 && in2 && outFile, "Files -i1, -i2 and -o have to be specified for dif.");
+			CHECK(numFiles == 3, "Two in-files and an out-file have to be specified");
 			AlgebraicVector av1, av2;
-			LoadVector(av1, in1, makeCons, numComponents);
-			LoadVector(av2, in2, makeCons, numComponents);
+			LoadVector(av1, file[0], makeCons, numComponents);
+			LoadVector(av2, file[1], makeCons, numComponents);
 			av1.subtract_vector(av2);
-			SaveAlgebraicVector(av1, outFile);
+			SaveAlgebraicVector(av1, file[2]);
 		
 			if(!av1.data.empty()){
 				cout << "min: " << av1.data[av1.index_with_min_value()]
@@ -596,35 +630,64 @@ int main(int argc, char** argv)
 			}
 		}
 		else if(command.find("minmax") == 0){
-			CHECK(in1, "File -i1 has to be specified for minmax.");
+			CHECK(numFiles == 1, "An in-file has to be specified.");
 			AlgebraicVector av;
-			LoadVector(av, in1, makeCons, numComponents);
+			LoadVector(av, file[0], makeCons, numComponents);
 			cout << "min: " << av.data[av.index_with_min_value()]
 					 << ", at: " << av.positions[av.index_with_min_value()] << endl;
 			cout << "max: " << av.data[av.index_with_max_value()]
 				 << ", at: " << av.positions[av.index_with_max_value()] << endl;
 		}
-		else if(command.find("pickcomponent") == 0){
-			CHECK(in1 && outFile, "Files -i1 and -o have to be specified for pickcomponent.");
-			CHECK(FindParam("-comp", argc, argv),
-				"Make sure to specify the component that shall be picked through '-comp'\n");
-			CHECK(FindParam("-comps", argc, argv),
-				"Make sure to specify the number of components of the loaded vector through '-comps'\n");
-			int pickedComponent = ParamToInt("-comp", argc, argv, 0);
-
+		else if(command.find("histogram") == 0){
+			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, in1, makeCons, numComponents);
-			SaveAlgebraicVectorComponent(av, outFile, numComponents, pickedComponent);
+			LoadVector(av, file[0], makeCons, numComponents);
+			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs);
 		}
 		else{
-			cout << "Invalid command. Please specify one of the following commands as first parameter: " << endl;
-			cout << "  combine: Loads a parallel vector and combines all parts to a serial one" << endl;
-			cout << "  dif: Subtracts the second vector from the first and writes the result to a file." << endl;
-			cout << "  minmax: Prints the minimal and maximal value of a vector" << endl;
-			cout << "  pickcomponent: Loads a vector, removes all components except for the specified one, and saves it." << endl;
+			cout << "vecutil - (c) 2015 Sebastian Reiter, G-CSC Frankfurt" << endl;
+			cout << endl;
+			cout << "USAGE: vecutil command [options] [files]" << endl;
+			cout << "OR:    vecutil command [files] [options]" << endl << endl;
+
+			cout << "SAMPLE: vecutil dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
+
+			cout << "COMMANDS:" << endl;
+			cout << "  combine:   Loads a parallel vector and combines all parts to a serial one" << endl;
+			cout << "             The parallel vector is assumed to be in additive storage." << endl;
+			cout << "             If this is not the case, please specify the paramter -consistent" << endl;
+			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
+
+  			cout << "  dif:       Subtracts the second vector from the first and writes the result to a file." << endl;
+  			cout << "             If a parallel input vectors are assumed to be in additive storage unless" << endl;
+  			cout << "             the option -consistent was specified" << endl;
+  			cout << "             3 Files required - 1: in-file-1, 2: in-file-2, 3: out-file" << endl << endl;
+
+  			cout << "  minmax:    Prints the minimal and maximal value of a vector" << endl;
+			cout << "             1 File required - 1: in-file" << endl << endl;
+
+			cout << "  histogram: Creates a histogram using the options -histoSecs and -histoAbs and writes" << endl;
+			cout << "             the result to a .ugx file." << endl;
+			cout << "             2 Files required - 1: in-files, 2: out-file ('.ugx')" << endl << endl;
+
+
+			cout << "OPTIONS:" << endl;
+			cout << "  -consistent:      If this parameter is specified, parallel vectors are assumed" << endl;
+			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
+			cout << "                    to be in additive storage mode." << endl << endl;
+
+			cout << "  -numComponents n: If more than one component is stored in a vector, this has to" << endl;
+			cout << "                    be indicated through this option. The option takes an additional" << endl;
+			cout << "                    integer value 'n' that specifies the number of components." << endl << endl;
+
+			cout << "  -histoSecs n:     Define the number of histogram-sections if a hostogram-command is used." << endl;
+			cout << "                    default is "<< defHistoSecs << endl << endl;
+
+			cout << "  -histoAbs:        If specified, hostogram-commands will operate on absolute values." << endl << endl;
 		}
 	}
 	catch(...){
+		return 1;
 	}
 	return 0;
 }
