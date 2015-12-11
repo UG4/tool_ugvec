@@ -412,17 +412,20 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 
 
 void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
-					 int numSections, bool absoluteValues)
+					 int numSections, bool absoluteValues, bool logScale)
 {
 	CHECK(numSections > 0, "Invalid number of sections provided: " << numSections);
+	CHECK(!logScale || absoluteValues, "Log scale histogram needs absolute values.")
 
 	number minVal = numeric_limits<number>::max();
 	number maxVal = numeric_limits<number>::min();
+	number minPosNonZeroVal = numeric_limits<number>::max();
 
 	if(absoluteValues){
 		for(size_t i = 0; i < av.data.size(); ++i){
 			minVal = min(minVal, fabs(av.data[i]));
 			maxVal = max(maxVal, fabs(av.data[i]));
+			if (fabs(av.data[i]) > 0.0) minPosNonZeroVal = min(minPosNonZeroVal, fabs(av.data[i]));
 		}
 	}
 	else{
@@ -432,7 +435,18 @@ void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
 		}
 	}
 
-	number range = maxVal - minVal;
+	number range;
+	if (logScale)
+	{
+		// ensure valid data range for log
+		CHECK(minVal >= 0, "Minimal absolute value cannot be negative!");
+		CHECK(minPosNonZeroVal != numeric_limits<number>::max(),
+			  "There needs to be at least one non-zero value for log scale histogram.");
+		range = log(maxVal) - log(minPosNonZeroVal);
+	}
+	else
+		range = maxVal - minVal;
+
 	if(range <= 0){
 		histOut.resize(av.data.size(), 0);
 		return;
@@ -443,7 +457,14 @@ void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
 
 	if(absoluteValues){
 		for(size_t i = 0; i < av.data.size(); ++i){
-			int section = (int)((number)numSections * (fabs(av.data[i]) - minVal) / range);
+			int section;
+			if (logScale)
+			{
+				if (av.data[i] == 0.0) section = 0;
+				else section = (int)((number)numSections * (log(fabs(av.data[i])) - log(minPosNonZeroVal)) / range);
+			}
+			else
+				section = (int)((number)numSections * (fabs(av.data[i]) - minVal) / range);
 			if(section < 0) section = 0;
 			if(section >= numSections) section = numSections - 1;
 			histOut[i] = section;
@@ -463,16 +484,18 @@ void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
 	cout << "Histogram Created:" << endl;
 	for(int isec = 0; isec < numSections; ++isec){
 		cout << "section " << isec << ":\t";
-		cout << minVal + (number)isec * range / (number)numSections;
+		if (logScale) cout << (isec == 0 ? minVal : minPosNonZeroVal*exp((number)isec * range / (number)numSections));
+		else cout << minVal + (number)isec * range / (number)numSections;
 		cout << " - ";
-		cout << minVal + (number)(isec+1) * range / (number)numSections;
+		if (logScale) cout << minPosNonZeroVal * exp((number)(isec+1) * range / (number)numSections);
+		else cout << minVal + (number)(isec+1) * range / (number)numSections;
 		cout << ":\t" << numEntriesPerSection[isec] << " entries." << endl;
 	}
 }
 
 
 bool SaveHistogramToUGX(const AlgebraicVector& av, const char* filename,
-						int numSections, bool absoluteValues)
+						int numSections, bool absoluteValues, bool logScale)
 {
 	cout << "INFO -- saving histogram to " << filename << endl;
 	
@@ -510,7 +533,7 @@ bool SaveHistogramToUGX(const AlgebraicVector& av, const char* filename,
 	out << "</vertices>" << endl;
 
 	vector<int> hist;
-	CreateHistogram(hist, av, numSections, absoluteValues);
+	CreateHistogram(hist, av, numSections, absoluteValues, logScale);
 	
 	out << "<subset_handler name=\"defSH\">" << endl;
 	for(int isec = 0; isec < numSections; ++isec){
@@ -547,7 +570,8 @@ int main(int argc, char** argv)
 	bool	makeCons 		= true;
 	int		numComponents	= 1;
 	int		histoSecs		= defHistoSecs;
-	int		histoAbs		= false;
+	bool	histoAbs		= false;
+	bool	histoLog		= false;
 
 	static const int maxNumFiles = 3;
 	const char* file[maxNumFiles];
@@ -582,6 +606,11 @@ int main(int argc, char** argv)
 			}
 
 			else if(strcmp(argv[i], "-histoAbs") == 0){
+				histoAbs = true;
+			}
+
+			else if(strcmp(argv[i], "-histoLog") == 0){
+				histoLog = true;
 				histoAbs = true;
 			}
 
@@ -642,7 +671,7 @@ int main(int argc, char** argv)
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, numComponents);
-			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs);
+			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs, histoLog);
 		}
 		else{
 			cout << "vecutil - (c) 2015 Sebastian Reiter, G-CSC Frankfurt" << endl;
@@ -683,7 +712,9 @@ int main(int argc, char** argv)
 			cout << "  -histoSecs n:     Define the number of histogram-sections if a hostogram-command is used." << endl;
 			cout << "                    default is "<< defHistoSecs << endl << endl;
 
-			cout << "  -histoAbs:        If specified, hostogram-commands will operate on absolute values." << endl << endl;
+			cout << "  -histoAbs:        If specified, histogram command will operate on absolute values." << endl << endl;
+			cout << "  -histoLog:        If specified, histogram command will use sections on a logarithmic scale" << endl
+				 << "                    (this implies -histoAbs)." << endl << endl;
 		}
 	}
 	catch(...){
