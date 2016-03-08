@@ -30,16 +30,18 @@ struct Position{
 	
 	bool operator == (const Position& p) const
 	{
-		return (fabs(x-p.x) < SMALL) && (fabs(y-p.y) < SMALL)
-				 && (fabs(z-p.z) < SMALL) && (ci == p.ci);
+		return (fabs(x) < fabs(x-p.x) < SMALL*(SMALL+max(fabs(x),fabs(p.x))))
+			&& (fabs(y-p.y) < SMALL*(SMALL+max(fabs(y),fabs(p.y))))
+			&& (fabs(z-p.z) < SMALL*(SMALL+max(fabs(z),fabs(p.z))))
+			&& (ci == p.ci);
 	}
 
 	bool operator < (const Position& p) const
 	{
 		const bool cEqual = ci == p.ci;
-		const bool xEqual = fabs(x-p.x) < SMALL;
-		const bool yEqual = fabs(y-p.y) < SMALL;
-		const bool zEqual = fabs(z-p.z) < SMALL;
+		const bool xEqual = fabs(x-p.x) < SMALL*(SMALL+max(fabs(x),fabs(p.x)));
+		const bool yEqual = fabs(y-p.y) < SMALL*(SMALL+max(fabs(y),fabs(p.y)));
+		const bool zEqual = fabs(z-p.z) < SMALL*(SMALL+max(fabs(z),fabs(p.z)));
 
 		if(cEqual){
 			if(xEqual){
@@ -411,6 +413,67 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 }
 
 
+bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t nComp, size_t comp)
+{
+	cout << "INFO -- saving vector to " << filename << endl;
+
+	if (av.data.size() != av.positions.size())
+	{
+		cout << "ERROR -- Invalid algebra vector - data and position size does not match."
+			 << " During write to " << filename << endl;
+		return false;
+	}
+
+	// check that size of data is multiple of #components
+	if (av.data.size() % nComp)
+	{
+		cout << "ERROR -- Given number of components does not match number of overall values in vector.\n"
+			 << "During write to " << filename << endl;
+		return false;
+	}
+
+	// check that 0 <= comp < nComp
+	if (comp >= nComp)
+	{
+		cout << "ERROR -- Requested component " << comp << " is not valid. Choose from 0 .. " << nComp << ".\n"
+			 << "During write to " << filename << endl;
+		return false;
+	}
+
+	ofstream out(filename);
+	if (!out)
+	{
+		cout << "ERROR -- File can not be opened for write: " << filename << endl;
+		return false;
+	}
+
+	out << int(1) << endl;
+	out << av.worldDim << endl;
+	out << av.positions.size()/nComp << endl;
+
+	for (size_t i = comp; i < av.positions.size(); i += nComp)
+	{
+		switch (av.worldDim)
+		{
+			case 1:	out << av.positions[i].x << endl; break;
+			case 2:	out << av.positions[i].x << " " << av.positions[i].y << endl; break;
+			case 3:	out << av.positions[i].x << " " << av.positions[i].y << " " << av.positions[i].z << endl; break;
+			default:
+				cout << "ERROR -- Unsupported world-dimension (" << av.worldDim
+					 << ") during write: " << filename << endl;
+				return false;
+		}
+	}
+
+	out << int(1) << endl;
+
+	for (size_t i = comp; i < av.data.size(); i += nComp)
+		out << int((i-comp)/5) << " " << int((i-comp)/5) << " " << av.data[i] << endl;
+
+	return true;
+}
+
+
 void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
 					 int numSections, bool absoluteValues, bool logScale)
 {
@@ -569,6 +632,7 @@ int main(int argc, char** argv)
 
 	bool	makeCons 		= true;
 	int		numComponents	= 1;
+	size_t	extractComp		= -1;
 	int		histoSecs		= defHistoSecs;
 	bool	histoAbs		= false;
 	bool	histoLog		= false;
@@ -590,6 +654,18 @@ int main(int argc, char** argv)
 				}
 				else{
 					cout << "Invalid use of '-components': An integer value has to be supplied." << endl;
+					return 1;
+				}
+			}
+
+			else if (strcmp(argv[i], "-extractComp") == 0){
+				if (i + 1 < argc)
+				{
+					extractComp = (size_t) atoi(argv[i+1]);
+					++i;
+				}
+				else{
+					cout << "Invalid use of '-extractComp': An integer value has to be supplied." << endl;
 					return 1;
 				}
 			}
@@ -643,6 +719,13 @@ int main(int argc, char** argv)
 			LoadVector(av, file[0], makeCons, numComponents);
 			SaveAlgebraicVector(av, file[1]);
 		}
+		else if(command.find("extract") == 0){
+			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
+			CHECK(extractComp != (size_t) -1, "Specifying -extractComp n is mandatory with 'extract'.");
+			AlgebraicVector av;
+			LoadVector(av, file[0], makeCons, numComponents);
+			SaveAlgebraicVector(av, file[1], numComponents, extractComp);
+		}
 		else if(command.find("dif") == 0){
 			CHECK(numFiles == 3, "Two in-files and an out-file have to be specified");
 			AlgebraicVector av1, av2;
@@ -687,6 +770,11 @@ int main(int argc, char** argv)
 			cout << "             If this is not the case, please specify the paramter -consistent" << endl;
 			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
 
+			cout << "  extract:   Saves a specific component of a multi-component vector." << endl;
+			cout << "  			  The additional options '-components m' and '-extractComp n'" << endl;
+			cout << "             are mandatory for this mode of operation." << endl;
+			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
+
   			cout << "  dif:       Subtracts the second vector from the first and writes the result to a file." << endl;
   			cout << "             If a parallel input vectors are assumed to be in additive storage unless" << endl;
   			cout << "             the option -consistent was specified" << endl;
@@ -708,6 +796,9 @@ int main(int argc, char** argv)
 			cout << "  -components n:    If more than one component is stored in a vector, this has to" << endl;
 			cout << "                    be indicated through this option. The option takes an additional" << endl;
 			cout << "                    integer value 'n' that specifies the number of components." << endl << endl;
+
+			cout << "  -extractComp n:   Mandatory option with the 'extract' mode of operation." << endl;
+			cout << "                    The number n specifies the component index (0 <= n < #comp) to be extracted." << endl << endl;
 
 			cout << "  -histoSecs n:     Define the number of histogram-sections if a hostogram-command is used." << endl;
 			cout << "                    default is "<< defHistoSecs << endl << endl;
