@@ -771,7 +771,7 @@ int main(int argc, char** argv)
 			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
 
 			cout << "  extract:   Saves a specific component of a multi-component vector." << endl;
-			cout << "  			  The additional options '-components m' and '-extractComp n'" << endl;
+			cout << "             The additional options '-components m' and '-extractComp n'" << endl;
 			cout << "             are mandatory for this mode of operation." << endl;
 			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
 
