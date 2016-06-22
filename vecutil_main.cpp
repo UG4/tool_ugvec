@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <vector>
 #include <cmath>
@@ -302,7 +303,9 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 
 		if(valstr.find('n') != string::npos or valstr.find('N') != string::npos)
 			++numNANs;
-		av.data[ind1] = atof(valstr.c_str());
+
+		try {av.data[ind1] = strtod(valstr.c_str(), NULL);}
+		catch(exception& e) {cout << e.what();}
 	}
 
 	if(numNANs > 0)
@@ -406,7 +409,9 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 	out << int(1) << endl;
 	
 	for(size_t i = 0; i < av.data.size(); ++i){
-		out << int(i) << " " << int(i) << " " << av.data[i] << endl;
+		out << int(i) << " " << int(i) << " "
+			<< setprecision(numeric_limits<number>::digits10 + 1)
+			<< av.data[i] << endl;
 	}
 	
 	return true;
@@ -468,7 +473,9 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t
 	out << int(1) << endl;
 
 	for (size_t i = comp; i < av.data.size(); i += nComp)
-		out << int((i-comp)/5) << " " << int((i-comp)/5) << " " << av.data[i] << endl;
+		out << int((i-comp)/5) << " " << int((i-comp)/5) << " "
+		<< setprecision(numeric_limits<number>::digits10 + 1)
+		<< av.data[i] << endl;
 
 	return true;
 }
