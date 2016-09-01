@@ -78,7 +78,7 @@ struct AlgebraicVector{
 	
 ///	adds values with same positions and inserts the others
 /**	returns a reference to this vector, so that add_vector can be chained.*/
-	AlgebraicVector& add_vector(const AlgebraicVector& av);
+	AlgebraicVector& add_vector(const AlgebraicVector& av, std::map<Position, size_t>* globPosMap = NULL);
 	
 ///	subtracts values with same positions.
 /**	If a position was not found in this vector, a default value of 0 will be assumed
@@ -87,7 +87,7 @@ struct AlgebraicVector{
 	
 ///	inserts values from the specified vector which did not yet exist in this vector
 /**	returns a reference to this vector, so that unite_with_vector can be chained.*/
-	AlgebraicVector& unite_with_vector(const AlgebraicVector& av);
+	AlgebraicVector& unite_with_vector(const AlgebraicVector& av, std::map<Position, size_t>* globPosMap = NULL);
 
 ///	multiplies all data values by the given scalar
 	AlgebraicVector& multiply_scalar(number s);
@@ -105,7 +105,7 @@ struct AlgebraicVector{
 
 
 AlgebraicVector& AlgebraicVector::
-add_vector(const AlgebraicVector& av)
+add_vector(const AlgebraicVector& av, std::map<Position, size_t>* globPosMap)
 {
 //todo:	Improve performance!!!
 //	iterate over all entries of av. If the position matches with an entry of
@@ -127,9 +127,12 @@ add_vector(const AlgebraicVector& av)
 	}
 	
 	typedef map<Position, size_t>	PosMap;
-	PosMap	posMap;
-	for(size_t i = 0; i < positions.size(); ++i)
-		posMap[positions[i]] = i;
+	PosMap	locPosMap;
+	PosMap& posMap = globPosMap ? *globPosMap : locPosMap;
+
+	if (!globPosMap)
+		for(size_t i = 0; i < positions.size(); ++i)
+			posMap[positions[i]] = i;
 
 	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
 		const Position& p_av = av.positions[i_av];
@@ -147,7 +150,7 @@ add_vector(const AlgebraicVector& av)
 }
 
 AlgebraicVector& AlgebraicVector::
-unite_with_vector(const AlgebraicVector& av)
+unite_with_vector(const AlgebraicVector& av, std::map<Position, size_t>* globPosMap)
 {
 //todo:	Improve performance!!!
 //	iterate over all entries of av. If the position matches with an entry of
@@ -169,9 +172,12 @@ unite_with_vector(const AlgebraicVector& av)
 	}
 	
 	typedef map<Position, size_t>	PosMap;
-	PosMap	posMap;
-	for(size_t i = 0; i < positions.size(); ++i)
-		posMap[positions[i]] = i;
+	PosMap	locPosMap;
+	PosMap& posMap = globPosMap ? *globPosMap : locPosMap;
+
+	if (!globPosMap)
+		for(size_t i = 0; i < positions.size(); ++i)
+			posMap[positions[i]] = i;
 
 
 	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
@@ -342,6 +348,8 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 	int numFiles;
 	inParallel >> numFiles;
 	
+	std::map<Position, size_t> globPosMap;
+
 	for(int i = 0; i < numFiles; ++i){
 		//char serialFile[512];
 		//inParallel.getline(serialFile, 511);
@@ -351,9 +359,9 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 		AlgebraicVector tmpAv;
 		if(LoadAlgebraicVector(tmpAv, tfilename.c_str(), numComponents)){
 			if(makeConsistent)
-				av.add_vector(tmpAv);
+				av.add_vector(tmpAv, &globPosMap);
 			else
-				av.unite_with_vector(tmpAv);
+				av.unite_with_vector(tmpAv, &globPosMap);
 		}
 		else
 			return false;
