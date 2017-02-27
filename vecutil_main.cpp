@@ -510,13 +510,15 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, int co
 
 	out << int(1) << endl;
 
+	size_t counter = 0;
 	for (size_t i = 0; i < av.data.size(); ++i){
 		if(av.positions[i].ci != comp)
 			continue;
 
-		out << int((i-comp)/5) << " " << int((i-comp)/5) << " "
+		out << counter << " " << counter << " "
 		<< setprecision(numeric_limits<number>::digits10 + 1)
 		<< av.data[i] << endl;
+		++counter;
 	}
 
 	return true;
