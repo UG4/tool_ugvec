@@ -19,7 +19,8 @@ using namespace std;
 typedef double	number;
 typedef unsigned int uint;
 
-const number SMALL = 1.e-12;
+const number DEFAULT_SMALL = 1.e-8;
+number SMALL = DEFAULT_SMALL;
 
 class CommonError{};
 #define CHECK(expr, msg) 	{if(!(expr)) {cout << "ERROR: " << msg << endl; throw CommonError();}}
@@ -31,18 +32,18 @@ struct Position{
 	
 	bool operator == (const Position& p) const
 	{
-		return (fabs(x) < fabs(x-p.x) < SMALL*(SMALL+max(fabs(x),fabs(p.x))))
-			&& (fabs(y-p.y) < SMALL*(SMALL+max(fabs(y),fabs(p.y))))
-			&& (fabs(z-p.z) < SMALL*(SMALL+max(fabs(z),fabs(p.z))))
+		return (fabs(x-p.x) < SMALL)
+			&& (fabs(y-p.y) < SMALL)
+			&& (fabs(z-p.z) < SMALL)
 			&& (ci == p.ci);
 	}
 
 	bool operator < (const Position& p) const
 	{
 		const bool cEqual = ci == p.ci;
-		const bool xEqual = fabs(x-p.x) < SMALL*(SMALL+max(fabs(x),fabs(p.x)));
-		const bool yEqual = fabs(y-p.y) < SMALL*(SMALL+max(fabs(y),fabs(p.y)));
-		const bool zEqual = fabs(z-p.z) < SMALL*(SMALL+max(fabs(z),fabs(p.z)));
+		const bool xEqual = fabs(x-p.x) < SMALL;
+		const bool yEqual = fabs(y-p.y) < SMALL;
+		const bool zEqual = fabs(z-p.z) < SMALL;
 
 		if(cEqual){
 			if(xEqual){
@@ -245,6 +246,7 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 {
 	cout << "INFO -- loading vector from " << filename << endl;
 	
+	string line;
 	ifstream in(filename);
 	if(!in){
 		cout << "ERROR -- File not found: " << filename << endl;
@@ -254,11 +256,6 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 	int blockSize;
 	in >> blockSize;
 	in >> av.worldDim;
-	
-	if(blockSize != 1){
-		cout << "ERROR -- Only blocksize 1 is supported! In File: " << filename << endl;
-		return false;
-	}
 	
 	
 	int numEntries;
@@ -282,22 +279,58 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 		av.positions[i].ci = (i % numComponents);
 	}
 	
+//	get the rest of the last line
+	getline(in, line);
 
-	int someVal;
-	in >> someVal;
-
-	if(blockSize != 1){
-		cout << "ERROR -- Value in between positions and data should be 1! In File: "
-			 << filename << endl;
-		return false;
-	}
-
+//	read some arbitrary value which separates positions and connections
+	getline(in, line);
 
 	size_t numNANs = 0;
+	vector<double> values;
+
 	for(int i = 0; i < numEntries; ++i){
-		int ind1, ind2;
-		string valstr;
-		in >> ind1 >> ind2 >> valstr;
+		getline(in, line);
+		size_t start = 0;
+		values.clear();
+		while(start < line.size()) {
+			const char cur = line[start];
+			if(cur == ' '){
+				++start;
+				continue;
+			}
+			else if (cur == '[' || cur == ']'){
+				++start;
+				continue;
+			}
+			else{
+				size_t end = line.find(' ', start);
+				if(end == string::npos)
+					end = line.size();
+				const size_t num = end - start;
+				if((line.find("n", start, num) != string::npos)
+					|| (line.find("N", start, num) != string::npos))
+				{
+					++numNANs;
+					continue;
+				}
+
+				char* endPtr;
+				const char* startPtr = line.c_str() + start;
+				values.push_back(strtod(startPtr, &endPtr));
+				start += endPtr - startPtr;
+			}
+		}
+
+		if(values.size() < 3){
+			cout << "ERROR -- Not enough values specified in connection. In File: "
+				<< filename << endl;
+			cout << "line read: " << line << endl;
+			continue;
+		}
+
+		const int ind1 = static_cast<int>(values[0]);
+		const int ind2 = static_cast<int>(values[1]);
+
 		if(ind1 != ind2){
 			cout << "ERROR -- Only connections to self are supported! In File: "
 				 << filename << endl;
@@ -307,11 +340,14 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 			cout << "ERROR -- Bad index: " << ind1 << ". In File: " << filename << endl;
 		}
 
-		if(valstr.find('n') != string::npos or valstr.find('N') != string::npos)
-			++numNANs;
+		av.data[ind1] = values[2];
 
-		try {av.data[ind1] = strtod(valstr.c_str(), NULL);}
-		catch(exception& e) {cout << e.what();}
+		for(size_t i = 3; i < values.size(); ++i){
+			Position p = av.positions[ind1];
+			p.ci = i-2;
+			av.positions.push_back(p);
+			av.data.push_back(values[i]);
+		}
 	}
 
 	if(numNANs > 0)
@@ -426,7 +462,7 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 }
 
 
-bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t nComp, size_t comp)
+bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, int comp)
 {
 	cout << "INFO -- saving vector to " << filename << endl;
 
@@ -437,22 +473,6 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t
 		return false;
 	}
 
-	// check that size of data is multiple of #components
-	if (av.data.size() % nComp)
-	{
-		cout << "ERROR -- Given number of components does not match number of overall values in vector.\n"
-			 << "During write to " << filename << endl;
-		return false;
-	}
-
-	// check that 0 <= comp < nComp
-	if (comp >= nComp)
-	{
-		cout << "ERROR -- Requested component " << comp << " is not valid. Choose from 0 .. " << nComp << ".\n"
-			 << "During write to " << filename << endl;
-		return false;
-	}
-
 	ofstream out(filename);
 	if (!out)
 	{
@@ -460,12 +480,22 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t
 		return false;
 	}
 
+//	count entries for given component
+	size_t numEntries = 0;
+	for(size_t i = 0; i < av.positions.size(); ++i){
+		if(av.positions[i].ci == comp)
+			++numEntries;
+	}
+
 	out << int(1) << endl;
 	out << av.worldDim << endl;
-	out << av.positions.size()/nComp << endl;
+	out << numEntries << endl;
 
-	for (size_t i = comp; i < av.positions.size(); i += nComp)
+	for (size_t i = 0; i < av.positions.size(); ++i)
 	{
+		if(av.positions[i].ci != comp)
+			continue;
+
 		switch (av.worldDim)
 		{
 			case 1:	out << av.positions[i].x << endl; break;
@@ -480,10 +510,14 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, size_t
 
 	out << int(1) << endl;
 
-	for (size_t i = comp; i < av.data.size(); i += nComp)
+	for (size_t i = 0; i < av.data.size(); ++i){
+		if(av.positions[i].ci != comp)
+			continue;
+
 		out << int((i-comp)/5) << " " << int((i-comp)/5) << " "
 		<< setprecision(numeric_limits<number>::digits10 + 1)
 		<< av.data[i] << endl;
+	}
 
 	return true;
 }
@@ -658,6 +692,11 @@ int main(int argc, char** argv)
 
 	for(int i = 2; i < argc; ++i){
 		if(argv[i][0] == '-'){
+			if(strcmp(argv[i], "-small") == 0){
+				SMALL = strtod(argv[i+1], NULL);
+				++i;
+			}
+
 			if(strcmp(argv[i], "-consistent") == 0){
 				makeCons = false;
 			}
@@ -739,7 +778,7 @@ int main(int argc, char** argv)
 			CHECK(extractComp != (size_t) -1, "Specifying -extractComp n is mandatory with 'extract'.");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, numComponents);
-			SaveAlgebraicVector(av, file[1], numComponents, extractComp);
+			SaveAlgebraicVector(av, file[1], extractComp);
 		}
 		else if(command.find("dif") == 0){
 			CHECK(numFiles == 3, "Two in-files and an out-file have to be specified");
@@ -804,6 +843,9 @@ int main(int argc, char** argv)
 
 
 			cout << "OPTIONS:" << endl;
+			cout << "  -small:           The maximal distance that two coordinates may have to be considered equal." << endl;
+			cout << "                    Default is " << DEFAULT_SMALL << endl << endl;
+
 			cout << "  -consistent:      If this parameter is specified, parallel vectors are assumed" << endl;
 			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
 			cout << "                    to be in additive storage mode." << endl << endl;
