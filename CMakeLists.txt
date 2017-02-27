@@ -8,7 +8,5 @@ project(vecutil)
 
 set(sources	vecutil_main.cpp)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "RELEASE" FORCE)
-
 add_executable(vecutil ${sources})
 install(TARGETS vecutil RUNTIME DESTINATION "bin")
