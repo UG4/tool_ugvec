@@ -79,8 +79,9 @@ struct AlgebraicVector{
 	
 ///	adds values with same positions and inserts the others
 /**	returns a reference to this vector, so that add_vector can be chained.*/
-	AlgebraicVector& add_vector(const AlgebraicVector& av);
-	
+    AlgebraicVector& add_vector(const AlgebraicVector& av);
+    AlgebraicVector& add_vector(const AlgebraicVector& av, std::map<Position, size_t>& globPosMap);
+
 ///	subtracts values with same positions.
 /**	If a position was not found in this vector, a default value of 0 will be assumed
  * returns a reference to this vector, so that add_vector can be chained.*/
@@ -89,6 +90,7 @@ struct AlgebraicVector{
 ///	inserts values from the specified vector which did not yet exist in this vector
 /**	returns a reference to this vector, so that unite_with_vector can be chained.*/
 	AlgebraicVector& unite_with_vector(const AlgebraicVector& av);
+	AlgebraicVector& unite_with_vector(const AlgebraicVector& av, std::map<Position, size_t>& globPosMap);
 
 ///	multiplies all data values by the given scalar
 	AlgebraicVector& multiply_scalar(number s);
@@ -106,83 +108,154 @@ struct AlgebraicVector{
 AlgebraicVector& AlgebraicVector::
 add_vector(const AlgebraicVector& av)
 {
-//todo:	Improve performance!!!
-//	iterate over all entries of av. If the position matches with an entry of
-//	this vector, then add the values. If not, insert the value and its position
-//	into this vector.
-	
-	assert(av.positions.size() == av.data.size());
-	assert(positions.size() == data.size());
-	
-	if(worldDim == 0){
-		assert(positions.size() == 0);
-		worldDim = av.worldDim;
-	}
-	else{
-		if(worldDim != av.worldDim){
-			cout << "ERROR -- Can't add vectors with different world dimensions!" << endl;
-			return *this;		
-		}
-	}
-	
-	typedef map<Position, size_t>	PosMap;
-	PosMap	posMap;
-	for(size_t i = 0; i < positions.size(); ++i)
-		posMap[positions[i]] = i;
+//  iterate over all entries of av. If the position matches with an entry of
+//  this vector, then add the values. If not, insert the value and its position
+//  into this vector.
 
-	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
-		const Position& p_av = av.positions[i_av];
-		PosMap::iterator piter = posMap.find(p_av);
-		if(piter == posMap.end()){
-			positions.push_back(p_av);
-			data.push_back(av.data[i_av]);
-		}
-		else{
-			data[piter->second] += av.data[i_av];
-		}
-	}
-	
-	return *this;
+    assert(av.positions.size() == av.data.size());
+    assert(positions.size() == data.size());
+
+    if(worldDim == 0){
+        assert(positions.size() == 0);
+        worldDim = av.worldDim;
+    }
+    else{
+        if(worldDim != av.worldDim){
+            cout << "ERROR -- Can't add vectors with different world dimensions!" << endl;
+            return *this;
+        }
+    }
+
+    typedef map<Position, size_t>   PosMap;
+    PosMap  posMap;
+    for(size_t i = 0; i < positions.size(); ++i)
+        posMap[positions[i]] = i;
+
+    for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
+        const Position& p_av = av.positions[i_av];
+        PosMap::iterator piter = posMap.find(p_av);
+        if(piter == posMap.end()){
+            positions.push_back(p_av);
+            data.push_back(av.data[i_av]);
+        }
+        else{
+            data[piter->second] += av.data[i_av];
+        }
+    }
+
+    return *this;
+}
+
+
+AlgebraicVector& AlgebraicVector::
+add_vector(const AlgebraicVector& av, std::map<Position, size_t>& globPosMap)
+{
+//  iterate over all entries of av. If the position matches with an entry of
+//  this vector, then add the values. If not, insert the value and its position
+//  into this vector.
+
+    assert(av.positions.size() == av.data.size());
+    assert(positions.size() == data.size());
+
+    if(worldDim == 0){
+        assert(positions.size() == 0);
+        worldDim = av.worldDim;
+    }
+    else{
+        if(worldDim != av.worldDim){
+            cout << "ERROR -- Can't add vectors with different world dimensions!" << endl;
+            return *this;
+        }
+    }
+
+    for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
+        const Position& p_av = av.positions[i_av];
+        std::map<Position, size_t>::iterator piter = globPosMap.find(p_av);
+        if(piter == globPosMap.end()){
+            positions.push_back(p_av);
+            data.push_back(av.data[i_av]);
+            globPosMap[p_av] = positions.size()-1;
+        }
+        else{
+            data[piter->second] += av.data[i_av];
+        }
+    }
+
+    return *this;
 }
 
 AlgebraicVector& AlgebraicVector::
 unite_with_vector(const AlgebraicVector& av)
 {
-//todo:	Improve performance!!!
-//	iterate over all entries of av. If the position matches with an entry of
-//	this vector, then ignore the values. If not, insert the value and its position
-//	into this vector.
-	
-	assert(av.positions.size() == av.data.size());
-	assert(positions.size() == data.size());
-	
-	if(worldDim == 0){
-		assert(positions.size() == 0);
-		worldDim = av.worldDim;
-	}
-	else{
-		if(worldDim != av.worldDim){
-			cout << "ERROR -- Can't unite vectors with different world dimensions!" << endl;
-			return *this;		
-		}
-	}
-	
-	typedef map<Position, size_t>	PosMap;
-	PosMap	posMap;
-	for(size_t i = 0; i < positions.size(); ++i)
-		posMap[positions[i]] = i;
+//  iterate over all entries of av. If the position matches with an entry of
+//  this vector, then ignore the values. If not, insert the value and its position
+//  into this vector.
+
+    assert(av.positions.size() == av.data.size());
+    assert(positions.size() == data.size());
+
+    if(worldDim == 0){
+        assert(positions.size() == 0);
+        worldDim = av.worldDim;
+    }
+    else{
+        if(worldDim != av.worldDim){
+            cout << "ERROR -- Can't unite vectors with different world dimensions!" << endl;
+            return *this;
+        }
+    }
+
+    typedef map<Position, size_t>   PosMap;
+    PosMap  posMap;
+    for(size_t i = 0; i < positions.size(); ++i)
+        posMap[positions[i]] = i;
 
 
-	for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
-		const Position& p_av = av.positions[i_av];
-		PosMap::iterator piter = posMap.find(p_av);
-		if(piter == posMap.end()){
-			positions.push_back(p_av);
-			data.push_back(av.data[i_av]);
-		}
-	}
+    for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
+        const Position& p_av = av.positions[i_av];
+        PosMap::iterator piter = posMap.find(p_av);
+        if(piter == posMap.end()){
+            positions.push_back(p_av);
+            data.push_back(av.data[i_av]);
+        }
+    }
 
-	return *this;
+    return *this;
+}
+
+
+AlgebraicVector& AlgebraicVector::
+unite_with_vector(const AlgebraicVector& av, std::map<Position, size_t>& globPosMap)
+{
+//  iterate over all entries of av. If the position matches with an entry of
+//  this vector, then ignore the values. If not, insert the value and its position
+//  into this vector.
+
+    assert(av.positions.size() == av.data.size());
+    assert(positions.size() == data.size());
+
+    if(worldDim == 0){
+        assert(positions.size() == 0);
+        worldDim = av.worldDim;
+    }
+    else{
+        if(worldDim != av.worldDim){
+            cout << "ERROR -- Can't unite vectors with different world dimensions!" << endl;
+            return *this;
+        }
+    }
+
+    for(size_t i_av = 0; i_av < av.positions.size(); ++i_av){
+        const Position& p_av = av.positions[i_av];
+        std::map<Position, size_t>::iterator piter = globPosMap.find(p_av);
+        if(piter == globPosMap.end()){
+            positions.push_back(p_av);
+            data.push_back(av.data[i_av]);
+            globPosMap[p_av] = positions.size()-1;
+        }
+    }
+
+    return *this;
 }
 
 AlgebraicVector& AlgebraicVector::
@@ -415,23 +488,50 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 	int numFiles;
 	inParallel >> numFiles;
 	
+#ifdef PARALLEL_LOAD_SPEEDUP
+	std::cout << "Using parallel load speedup." << std::endl;
+	if (numFiles < 2)
+	{
+#endif
 	for(int i = 0; i < numFiles; ++i){
-		//char serialFile[512];
-		//inParallel.getline(serialFile, 511);
-		string serialFile;
-		inParallel >> serialFile;
-		string tfilename = path + serialFile;
-		AlgebraicVector tmpAv;
-		if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
-			if(makeConsistent)
-				av.add_vector(tmpAv);
-			else
-				av.unite_with_vector(tmpAv);
-		}
-		else
-			return false;
+        //char serialFile[512];
+        //inParallel.getline(serialFile, 511);
+        string serialFile;
+        inParallel >> serialFile;
+        string tfilename = path + serialFile;
+        AlgebraicVector tmpAv;
+        if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
+            if(makeConsistent)
+                av.add_vector(tmpAv);
+            else
+                av.unite_with_vector(tmpAv);
+        }
+        else
+            return false;
+    }
+#ifdef PARALLEL_LOAD_SPEEDUP
 	}
-	
+	else
+	{
+	    std::map<Position, size_t> globPosMap;
+
+	    for(int i = 0; i < numFiles; ++i){
+            string serialFile;
+            inParallel >> serialFile;
+            string tfilename = path + serialFile;
+            AlgebraicVector tmpAv;
+            if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
+                if(makeConsistent)
+                    av.add_vector(tmpAv, globPosMap);
+                else
+                    av.unite_with_vector(tmpAv, globPosMap);
+            }
+            else
+                return false;
+	    }
+	}
+#endif
+
 	return true;
 }
 
