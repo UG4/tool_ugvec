@@ -1,0 +1,2 @@
+Think about adding an '-abs' parameter, which will convert all vectors to
+absolute values during load. This may replace the Histogram -abs parameter.

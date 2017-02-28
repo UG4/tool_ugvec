@@ -93,11 +93,10 @@ struct AlgebraicVector{
 ///	multiplies all data values by the given scalar
 	AlgebraicVector& multiply_scalar(number s);
 	
-///	returns the first index at which the maximum can be found. -1 for empty vectors.
-	int index_with_max_value() const;
-///	returns the first index at which the minimum can be found. -1 for empty vectors.
-	int index_with_min_value() const;
-	
+///	returns the maximum component index stored in positions. ATTENTION: O(n)
+/** \return The highest component index in positions. -1 if positions is empty.*/
+	int max_component_index() const;
+
 	int	worldDim;
 	vector<Position> positions;
 	vector<number>	 data;
@@ -210,34 +209,50 @@ multiply_scalar(number s)
 	return *this;
 }
 
-int AlgebraicVector::
-index_with_max_value() const
-{
-	if(data.empty())
-		return -1;
-	int maxInd = 0;
-	
-	for(int i = 1; i < data.size(); ++i){
-		if(data[i] > data[maxInd])
-			maxInd = i;
-	}
-	
-	return maxInd;
-}
 
 int AlgebraicVector::
-index_with_min_value() const
+max_component_index() const
 {
-	if(data.empty())
-		return -1;
-	int minInd = 0;
-	
-	for(int i = 1; i < data.size(); ++i){
-		if(data[i] < data[minInd])
-			minInd = i;
+	int maxCI = -1;
+	for(size_t i = 0; i < positions.size(); ++i)
+		maxCI = max(maxCI, positions[i].ci);
+	return maxCI;
+}
+
+
+void PrintMinMax(const AlgebraicVector& av)
+{
+	if(av.data.empty())
+		return;
+
+	CHECK(av.positions.size() == av.data.size(),
+		  "There should be as many position as data entries in an AlgebraicVector!");
+
+	const int numCIs = av.max_component_index() + 1;
+
+	vector<number> mins(numCIs, numeric_limits<number>::max());
+	vector<number> maxs(numCIs, -numeric_limits<number>::max());
+	vector<Position> minPos(numCIs);
+	vector<Position> maxPos(numCIs);
+
+	for(size_t i = 0; i < av.positions.size(); ++i){
+		const int ci = av.positions[i].ci;
+		if(av.data[i] < mins[ci]){
+			mins[ci] = av.data[i];
+			minPos[ci] = av.positions[i];
+		}
+
+		if(av.data[i] > maxs[ci]){
+			maxs[ci] = av.data[i];
+			maxPos[ci] = av.positions[i];
+		}
 	}
-	
-	return minInd;
+
+	for(int ci = 0; ci < numCIs; ++ci){
+		cout << "Component " << ci << endl;
+		cout << "  min: " << mins[ci] << "\tat   " << minPos[ci] << endl;
+		cout << "  max: " << maxs[ci] << "\tat   " << maxPos[ci] << endl;
+	}
 }
 
 
@@ -506,7 +521,7 @@ void CreateHistogram(vector<int>& histOut, const AlgebraicVector& av,
 	CHECK(!logScale || absoluteValues, "Log scale histogram needs absolute values.")
 
 	number minVal = numeric_limits<number>::max();
-	number maxVal = numeric_limits<number>::min();
+	number maxVal = -numeric_limits<number>::max();
 	number minPosNonZeroVal = numeric_limits<number>::max();
 
 	if(absoluteValues){
@@ -751,22 +766,13 @@ int main(int argc, char** argv)
 			LoadVector(av2, file[1], makeCons, component);
 			av1.subtract_vector(av2);
 			SaveAlgebraicVector(av1, file[2]);
-		
-			if(!av1.data.empty()){
-				cout << "min: " << av1.data[av1.index_with_min_value()]
-					 << ", at: " << av1.positions[av1.index_with_min_value()] << endl;
-				cout << "max: " << av1.data[av1.index_with_max_value()]
-					 << ", at: " << av1.positions[av1.index_with_max_value()] << endl;
-			}
+			PrintMinMax(av1);
 		}
 		else if(command.find("minmax") == 0){
 			CHECK(numFiles == 1, "An in-file has to be specified.");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, component);
-			cout << "min: " << av.data[av.index_with_min_value()]
-					 << ", at: " << av.positions[av.index_with_min_value()] << endl;
-			cout << "max: " << av.data[av.index_with_max_value()]
-				 << ", at: " << av.positions[av.index_with_max_value()] << endl;
+			PrintMinMax(av);
 		}
 		else if(command.find("histogram") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
