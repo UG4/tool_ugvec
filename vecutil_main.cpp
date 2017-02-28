@@ -239,7 +239,23 @@ index_with_min_value() const
 	
 	return minInd;
 }
-	
+
+
+void ExtractComponent(AlgebraicVector& out, const AlgebraicVector& av, int ci)
+{
+	out.positions.clear();
+	out.data.clear();
+	out.worldDim = av.worldDim;
+
+	for(size_t i = 0; i < av.positions.size(); ++i){
+		if(av.positions[i].ci == ci){
+			out.positions.push_back(av.positions[i]);
+			out.positions.back().ci = 0;
+			out.data.push_back(av.data[i]);
+		}
+	}
+}
+
 	
 bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename)
 {
@@ -263,7 +279,7 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename)
 	
 	std::map<Position, size_t> posMap;
 
-	
+
 	for(int i = 0; i < numEntries; ++i){
 		Position p;
 		switch(av.worldDim){
@@ -413,14 +429,29 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 }
 
 bool LoadVector(AlgebraicVector& av, const char* filename,
-				bool makeConsistent)
+				bool makeConsistent, int component = -1)
 {
 	string name = filename;
-	if(name.rfind(".pvec") != string::npos){
-		return LoadParallelVector(av, filename, makeConsistent);
+	
+	if(component == -1){
+		if(name.rfind(".pvec") != string::npos)
+			return LoadParallelVector(av, filename, makeConsistent);
+		else
+			return LoadAlgebraicVector(av, filename);
 	}
-	else{
-		return LoadAlgebraicVector(av, filename);
+	else {
+		AlgebraicVector tmpAv;
+		bool success = false;
+
+		if(name.rfind(".pvec") != string::npos)
+			success = LoadParallelVector(tmpAv, filename, makeConsistent);
+		else
+			success = LoadAlgebraicVector(tmpAv, filename);
+		
+		if(success)
+			ExtractComponent(av, tmpAv, component);
+
+		return success;
 	}
 }
 
@@ -464,69 +495,6 @@ bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename)
 			<< av.data[i] << endl;
 	}
 	
-	return true;
-}
-
-
-bool SaveAlgebraicVector(const AlgebraicVector& av, const char* filename, int comp)
-{
-	cout << "INFO -- saving vector to " << filename << endl;
-
-	if (av.data.size() != av.positions.size())
-	{
-		cout << "ERROR -- Invalid algebra vector - data and position size does not match."
-			 << " During write to " << filename << endl;
-		return false;
-	}
-
-	ofstream out(filename);
-	if (!out)
-	{
-		cout << "ERROR -- File can not be opened for write: " << filename << endl;
-		return false;
-	}
-
-//	count entries for given component
-	size_t numEntries = 0;
-	for(size_t i = 0; i < av.positions.size(); ++i){
-		if(av.positions[i].ci == comp)
-			++numEntries;
-	}
-
-	out << int(1) << endl;
-	out << av.worldDim << endl;
-	out << numEntries << endl;
-
-	for (size_t i = 0; i < av.positions.size(); ++i)
-	{
-		if(av.positions[i].ci != comp)
-			continue;
-
-		switch (av.worldDim)
-		{
-			case 1:	out << av.positions[i].x << endl; break;
-			case 2:	out << av.positions[i].x << " " << av.positions[i].y << endl; break;
-			case 3:	out << av.positions[i].x << " " << av.positions[i].y << " " << av.positions[i].z << endl; break;
-			default:
-				cout << "ERROR -- Unsupported world-dimension (" << av.worldDim
-					 << ") during write: " << filename << endl;
-				return false;
-		}
-	}
-
-	out << int(1) << endl;
-
-	size_t counter = 0;
-	for (size_t i = 0; i < av.data.size(); ++i){
-		if(av.positions[i].ci != comp)
-			continue;
-
-		out << counter << " " << counter << " "
-		<< setprecision(numeric_limits<number>::digits10 + 1)
-		<< av.data[i] << endl;
-		++counter;
-	}
-
 	return true;
 }
 
@@ -688,7 +656,7 @@ int main(int argc, char** argv)
 	int		defHistoSecs = 5;
 
 	bool	makeCons 		= true;
-	size_t	extractComp		= -1;
+	int		component		= -1;
 	int		histoSecs		= defHistoSecs;
 	bool	histoAbs		= false;
 	bool	histoLog		= false;
@@ -715,14 +683,14 @@ int main(int argc, char** argv)
 				makeCons = false;
 			}
 
-			else if (strcmp(argv[i], "-extractComp") == 0){
+			else if (strcmp(argv[i], "-component") == 0){
 				if (i + 1 < argc)
 				{
-					extractComp = (size_t) atoi(argv[i+1]);
+					component = atoi(argv[i+1]);
 					++i;
 				}
 				else{
-					cout << "Invalid use of '-extractComp': An integer value has to be supplied." << endl;
+					cout << "Invalid use of '-component': An integer value has to be supplied." << endl;
 					return 1;
 				}
 			}
@@ -770,24 +738,17 @@ int main(int argc, char** argv)
 
 
 	try{
-		if(command.find("combine") == 0){
+		if(command.find("process") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons);
+			LoadVector(av, file[0], makeCons, component);
 			SaveAlgebraicVector(av, file[1]);
-		}
-		else if(command.find("extract") == 0){
-			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
-			CHECK(extractComp != (size_t) -1, "Specifying -extractComp n is mandatory with 'extract'.");
-			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons);
-			SaveAlgebraicVector(av, file[1], extractComp);
 		}
 		else if(command.find("dif") == 0){
 			CHECK(numFiles == 3, "Two in-files and an out-file have to be specified");
 			AlgebraicVector av1, av2;
-			LoadVector(av1, file[0], makeCons);
-			LoadVector(av2, file[1], makeCons);
+			LoadVector(av1, file[0], makeCons, component);
+			LoadVector(av2, file[1], makeCons, component);
 			av1.subtract_vector(av2);
 			SaveAlgebraicVector(av1, file[2]);
 		
@@ -801,7 +762,7 @@ int main(int argc, char** argv)
 		else if(command.find("minmax") == 0){
 			CHECK(numFiles == 1, "An in-file has to be specified.");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons);
+			LoadVector(av, file[0], makeCons, component);
 			cout << "min: " << av.data[av.index_with_min_value()]
 					 << ", at: " << av.positions[av.index_with_min_value()] << endl;
 			cout << "max: " << av.data[av.index_with_max_value()]
@@ -810,11 +771,11 @@ int main(int argc, char** argv)
 		else if(command.find("histogram") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons);
+			LoadVector(av, file[0], makeCons, component);
 			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs, histoLog);
 		}
 		else{
-			cout << "vecutil - (c) 2015 Sebastian Reiter, G-CSC Frankfurt" << endl;
+			cout << "vecutil - (c) 2013-2017 Sebastian Reiter, G-CSC Frankfurt" << endl;
 			cout << endl;
 			cout << "USAGE: vecutil command [options] [files]" << endl;
 			cout << "OR:    vecutil command [files] [options]" << endl << endl;
@@ -822,18 +783,16 @@ int main(int argc, char** argv)
 			cout << "SAMPLE: vecutil dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
 
 			cout << "COMMANDS:" << endl;
-			cout << "  combine:   Loads a parallel vector and combines all parts to a serial one" << endl;
-			cout << "             The parallel vector is assumed to be in additive storage." << endl;
-			cout << "             If this is not the case, please specify the paramter -consistent" << endl;
-			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
-
-			cout << "  extract:   Saves a specific component of a multi-component vector." << endl;
-			cout << "             The additional options '-components m' and '-extractComp n'" << endl;
-			cout << "             are mandatory for this mode of operation." << endl;
+			cout << "  process:   Loads a vector, processes it, and saves it to the specified file." << endl;
+			cout << "             If the vector is parallel, it will combine it to a serial one before saving." << endl;
+			cout << "             The default storage type assumed is 'additive'. If the provided vector has" << endl;
+			cout << "             consistent storage type, please spefify the option '-consistent'." << endl;
+			cout << "             If a component is specified through the '-component' option, only the specified" << endl;
+			cout << "             component will be written to the resulting file." << endl;
 			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
 
   			cout << "  dif:       Subtracts the second vector from the first and writes the result to a file." << endl;
-  			cout << "             If a parallel input vectors are assumed to be in additive storage unless" << endl;
+  			cout << "             Parallel input vectors are assumed to be in additive storage unless" << endl;
   			cout << "             the option -consistent was specified" << endl;
   			cout << "             3 Files required - 1: in-file-1, 2: in-file-2, 3: out-file" << endl << endl;
 
@@ -853,8 +812,8 @@ int main(int argc, char** argv)
 			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
 			cout << "                    to be in additive storage mode." << endl << endl;
 
-			cout << "  -extractComp n:   Mandatory option with the 'extract' mode of operation." << endl;
-			cout << "                    The number n specifies the component index (0 <= n < #comp) to be extracted." << endl << endl;
+			cout << "  -component n:     The number n specifies the component index (0 <= n < #comp) on which to work." << endl;
+			cout << "                    All other components will be dismissed." << endl << endl;
 
 			cout << "  -histoSecs n:     Define the number of histogram-sections if a hostogram-command is used." << endl;
 			cout << "                    default is "<< defHistoSecs << endl << endl;
