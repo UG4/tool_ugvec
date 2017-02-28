@@ -792,7 +792,7 @@ int main(int argc, char** argv)
 			cout << "  process:   Loads a vector, processes it, and saves it to the specified file." << endl;
 			cout << "             If the vector is parallel, it will combine it to a serial one before saving." << endl;
 			cout << "             The default storage type assumed is 'additive'. If the provided vector has" << endl;
-			cout << "             consistent storage type, please spefify the option '-consistent'." << endl;
+			cout << "             consistent storage type, please specify the option '-consistent'." << endl;
 			cout << "             If a component is specified through the '-component' option, only the specified" << endl;
 			cout << "             component will be written to the resulting file." << endl;
 			cout << "             2 Files required - 1: in-file, 2: out-file" << endl << endl;
@@ -802,7 +802,7 @@ int main(int argc, char** argv)
   			cout << "             the option -consistent was specified" << endl;
   			cout << "             3 Files required - 1: in-file-1, 2: in-file-2, 3: out-file" << endl << endl;
 
-  			cout << "  minmax:    Prints the minimal and maximal value of a vector" << endl;
+  			cout << "  minmax:    Prints the minimal and maximal values of each component of a vector" << endl;
 			cout << "             1 File required - 1: in-file" << endl << endl;
 
 			cout << "  histogram: Creates a histogram using the options -histoSecs and -histoAbs and writes" << endl;
