@@ -1,6 +1,6 @@
 //	created by Sebastian Reiter
 //	s.b.reiter@gmail.com
-//	Feb. 2013
+
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -75,7 +75,7 @@ ostream& operator << (ostream& out, const Position& p)
 
 
 struct AlgebraicVector{
-	AlgebraicVector() : worldDim(0), numComponents(1)	{}
+	AlgebraicVector() : worldDim(0)	{}
 	
 ///	adds values with same positions and inserts the others
 /**	returns a reference to this vector, so that add_vector can be chained.*/
@@ -99,7 +99,6 @@ struct AlgebraicVector{
 	int index_with_min_value() const;
 	
 	int	worldDim;
-	int numComponents;
 	vector<Position> positions;
 	vector<number>	 data;
 };
@@ -242,7 +241,7 @@ index_with_min_value() const
 }
 	
 	
-bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numComponents)
+bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename)
 {
 	cout << "INFO -- loading vector from " << filename << endl;
 	
@@ -257,26 +256,31 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 	in >> blockSize;
 	in >> av.worldDim;
 	
-	
 	int numEntries;
 	in >> numEntries;
 	av.positions.clear();
-	av.positions.resize(numEntries);
-	av.data.clear();
-	av.data.resize(numEntries, 0);
-	av.numComponents = numComponents;
+	av.positions.reserve(numEntries);
+	
+	std::map<Position, size_t> posMap;
+
 	
 	for(int i = 0; i < numEntries; ++i){
+		Position p;
 		switch(av.worldDim){
-			case 1:	in >> av.positions[i].x; break;
-			case 2:	in >> av.positions[i].x >> av.positions[i].y; break;
-			case 3:	in >> av.positions[i].x >> av.positions[i].y >> av.positions[i].z; break;
+			case 1:	in >> p.x; break;
+			case 2:	in >> p.x >> p.y; break;
+			case 3:	in >> p.x >> p.y >> p.z; break;
 			default:
 				cout << "ERROR -- Unsupported world-dimension (" << av.worldDim
 					 << ") during write: " << filename << endl;
 				return false;
 		}
-		av.positions[i].ci = (i % numComponents);
+
+	//	during the lookup p.ci should always be 0
+		size_t& ci = posMap[p];
+		p.ci = ci;
+		++ci;
+		av.positions.push_back(p);
 	}
 	
 //	get the rest of the last line
@@ -284,6 +288,10 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 
 //	read some arbitrary value which separates positions and connections
 	getline(in, line);
+
+//	read data values
+	av.data.clear();
+	av.data.resize(numEntries, 0);
 
 	size_t numNANs = 0;
 	vector<double> values;
@@ -358,7 +366,7 @@ bool LoadAlgebraicVector(AlgebraicVector& av, const char* filename, int numCompo
 
 
 bool LoadParallelVector(AlgebraicVector& av, const char* filename,
-						bool makeConsistent, int numComponents)
+						bool makeConsistent)
 {
 	cout << "INFO -- loading parallel vector from " << filename << endl;
 	
@@ -379,8 +387,6 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 		return false;
 	}
 	
-	av.numComponents = numComponents;
-
 	int numFiles;
 	inParallel >> numFiles;
 	
@@ -393,7 +399,7 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 		inParallel >> serialFile;
 		string tfilename = path + serialFile;
 		AlgebraicVector tmpAv;
-		if(LoadAlgebraicVector(tmpAv, tfilename.c_str(), numComponents)){
+		if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
 			if(makeConsistent)
 				av.add_vector(tmpAv, &globPosMap);
 			else
@@ -407,14 +413,14 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 }
 
 bool LoadVector(AlgebraicVector& av, const char* filename,
-				bool makeConsistent, int numComponents)
+				bool makeConsistent)
 {
 	string name = filename;
 	if(name.rfind(".pvec") != string::npos){
-		return LoadParallelVector(av, filename, makeConsistent, numComponents);
+		return LoadParallelVector(av, filename, makeConsistent);
 	}
 	else{
-		return LoadAlgebraicVector(av, filename, numComponents);
+		return LoadAlgebraicVector(av, filename);
 	}
 }
 
@@ -682,7 +688,6 @@ int main(int argc, char** argv)
 	int		defHistoSecs = 5;
 
 	bool	makeCons 		= true;
-	int		numComponents	= 1;
 	size_t	extractComp		= -1;
 	int		histoSecs		= defHistoSecs;
 	bool	histoAbs		= false;
@@ -695,23 +700,19 @@ int main(int argc, char** argv)
 	for(int i = 2; i < argc; ++i){
 		if(argv[i][0] == '-'){
 			if(strcmp(argv[i], "-small") == 0){
-				SMALL = strtod(argv[i+1], NULL);
-				++i;
-			}
-
-			if(strcmp(argv[i], "-consistent") == 0){
-				makeCons = false;
-			}
-
-			else if(strcmp(argv[i], "-components") == 0){
-				if(i + 1 < argc){
-					numComponents = atoi(argv[i+1]);
+				if (i + 1 < argc)
+				{
+					SMALL = strtod(argv[i+1], NULL);
 					++i;
 				}
 				else{
-					cout << "Invalid use of '-components': An integer value has to be supplied." << endl;
+					cout << "Invalid use of '-small': A floating point value has to be supplied." << endl;
 					return 1;
 				}
+			}
+
+			else if(strcmp(argv[i], "-consistent") == 0){
+				makeCons = false;
 			}
 
 			else if (strcmp(argv[i], "-extractComp") == 0){
@@ -772,21 +773,21 @@ int main(int argc, char** argv)
 		if(command.find("combine") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons, numComponents);
+			LoadVector(av, file[0], makeCons);
 			SaveAlgebraicVector(av, file[1]);
 		}
 		else if(command.find("extract") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			CHECK(extractComp != (size_t) -1, "Specifying -extractComp n is mandatory with 'extract'.");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons, numComponents);
+			LoadVector(av, file[0], makeCons);
 			SaveAlgebraicVector(av, file[1], extractComp);
 		}
 		else if(command.find("dif") == 0){
 			CHECK(numFiles == 3, "Two in-files and an out-file have to be specified");
 			AlgebraicVector av1, av2;
-			LoadVector(av1, file[0], makeCons, numComponents);
-			LoadVector(av2, file[1], makeCons, numComponents);
+			LoadVector(av1, file[0], makeCons);
+			LoadVector(av2, file[1], makeCons);
 			av1.subtract_vector(av2);
 			SaveAlgebraicVector(av1, file[2]);
 		
@@ -800,7 +801,7 @@ int main(int argc, char** argv)
 		else if(command.find("minmax") == 0){
 			CHECK(numFiles == 1, "An in-file has to be specified.");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons, numComponents);
+			LoadVector(av, file[0], makeCons);
 			cout << "min: " << av.data[av.index_with_min_value()]
 					 << ", at: " << av.positions[av.index_with_min_value()] << endl;
 			cout << "max: " << av.data[av.index_with_max_value()]
@@ -809,7 +810,7 @@ int main(int argc, char** argv)
 		else if(command.find("histogram") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
-			LoadVector(av, file[0], makeCons, numComponents);
+			LoadVector(av, file[0], makeCons);
 			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs, histoLog);
 		}
 		else{
@@ -851,10 +852,6 @@ int main(int argc, char** argv)
 			cout << "  -consistent:      If this parameter is specified, parallel vectors are assumed" << endl;
 			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
 			cout << "                    to be in additive storage mode." << endl << endl;
-
-			cout << "  -components n:    If more than one component is stored in a vector, this has to" << endl;
-			cout << "                    be indicated through this option. The option takes an additional" << endl;
-			cout << "                    integer value 'n' that specifies the number of components." << endl << endl;
 
 			cout << "  -extractComp n:   Mandatory option with the 'extract' mode of operation." << endl;
 			cout << "                    The number n specifies the component index (0 <= n < #comp) to be extracted." << endl << endl;

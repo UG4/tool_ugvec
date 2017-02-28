@@ -1,4 +1,0 @@
-Different Components should be recognized automatically. This is already the
-case for blocked components. For non-blocked components one would have
-to create a second map only for loading and merge that with the vectors main
-map afterwards.
