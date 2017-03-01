@@ -497,6 +497,7 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
         AlgebraicVector tmpAv;
         if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
         	if(useGlobPosMap){
+        		cout << "  using parallel load speedup.\n";
 				if(makeConsistent)
 					av.add_vector(tmpAv, globPosMap);
 				else
@@ -808,6 +809,10 @@ int main(int argc, char** argv)
 			else if(strcmp(argv[i], "-histoLog") == 0){
 				histoLog = true;
 				histoAbs = true;
+			}
+
+			else if(strcmp(argv[i], "-verbose") == 0){
+				verbose = true;
 			}
 
 			else{
