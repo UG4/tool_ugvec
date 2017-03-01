@@ -19,12 +19,8 @@ using namespace std;
 typedef double	number;
 typedef unsigned int uint;
 
-const number DEFAULT_SMALL = 1.e-8;
-number SMALL = DEFAULT_SMALL;
-
 class CommonError{};
 #define CHECK(expr, msg) 	{if(!(expr)) {cout << "ERROR: " << msg << endl; throw CommonError();}}
-
 
 
 struct Position{
@@ -32,35 +28,32 @@ struct Position{
 	
 	bool operator == (const Position& p) const
 	{
-		return (fabs(x-p.x) < SMALL)
-			&& (fabs(y-p.y) < SMALL)
-			&& (fabs(z-p.z) < SMALL)
-			&& (ci == p.ci);
+		return x == p.x && y == p.y && z == p.z && ci == p.ci;
 	}
 
 	bool operator < (const Position& p) const
 	{
-		const bool cEqual = ci == p.ci;
-		const bool xEqual = fabs(x-p.x) < SMALL;
-		const bool yEqual = fabs(y-p.y) < SMALL;
-		const bool zEqual = fabs(z-p.z) < SMALL;
+		if(ci < p.ci)
+			return true;
+		else if(ci > p.ci)
+			return false;
+		
+		if(x < p.x)
+			return true;
+		else if(x > p.x)
+			return false;
 
-		if(cEqual){
-			if(xEqual){
-				if(yEqual){
-					if(zEqual)
-						return false;
-					else
-						return z < p.z;
-				}
-				else
-					return y < p.y;
-			}
-			else
-				return x < p.x;
-		}
-		else
-			return ci < p.ci;
+		if(y < p.y)
+			return true;
+		else if(y > p.y)
+			return false;
+
+		if(z < p.z)
+			return true;
+		else if(z > p.z)
+			return false;
+
+		return false;
 	}
 	
 	number x, y, z;
@@ -774,19 +767,8 @@ int main(int argc, char** argv)
 
 	for(int i = 2; i < argc; ++i){
 		if(argv[i][0] == '-'){
-			if(strcmp(argv[i], "-small") == 0){
-				if (i + 1 < argc)
-				{
-					SMALL = strtod(argv[i+1], NULL);
-					++i;
-				}
-				else{
-					cout << "Invalid use of '-small': A floating point value has to be supplied." << endl;
-					return 1;
-				}
-			}
-
-			else if(strcmp(argv[i], "-consistent") == 0){
+			
+			if(strcmp(argv[i], "-consistent") == 0){
 				makeCons = false;
 			}
 
@@ -881,6 +863,7 @@ int main(int argc, char** argv)
 			cout << "SAMPLE: vecutil dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
 
 			cout << "COMMANDS:" << endl;
+			
 			cout << "  process:   Loads a vector, processes it, and saves it to the specified file." << endl;
 			cout << "             If the vector is parallel, it will combine it to a serial one before saving." << endl;
 			cout << "             The default storage type assumed is 'additive'. If the provided vector has" << endl;
@@ -903,8 +886,6 @@ int main(int argc, char** argv)
 
 
 			cout << "OPTIONS:" << endl;
-			cout << "  -small:           The maximal distance that two coordinates may have to be considered equal." << endl;
-			cout << "                    Default is " << DEFAULT_SMALL << endl << endl;
 
 			cout << "  -consistent:      If this parameter is specified, parallel vectors are assumed" << endl;
 			cout << "                    to be in consistent storage mode. Otherwise they are assumed" << endl;
