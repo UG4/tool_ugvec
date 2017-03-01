@@ -481,11 +481,13 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
 	int numFiles;
 	inParallel >> numFiles;
 	
-#ifdef PARALLEL_LOAD_SPEEDUP
-	std::cout << "Using parallel load speedup." << std::endl;
-	if (numFiles < 2)
-	{
-#endif
+	bool useGlobPosMap = false;
+	#ifdef PARALLEL_LOAD_SPEEDUP
+		useGlobPosMap = (numFiles > 1);
+	#endif
+
+	std::map<Position, size_t> globPosMap;
+
 	for(int i = 0; i < numFiles; ++i){
         //char serialFile[512];
         //inParallel.getline(serialFile, 511);
@@ -494,36 +496,22 @@ bool LoadParallelVector(AlgebraicVector& av, const char* filename,
         string tfilename = path + serialFile;
         AlgebraicVector tmpAv;
         if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
-            if(makeConsistent)
-                av.add_vector(tmpAv);
-            else
-                av.unite_with_vector(tmpAv);
+        	if(useGlobPosMap){
+				if(makeConsistent)
+					av.add_vector(tmpAv, globPosMap);
+				else
+					av.unite_with_vector(tmpAv, globPosMap);
+			}
+			else{
+				if(makeConsistent)
+					av.add_vector(tmpAv);
+				else
+					av.unite_with_vector(tmpAv);
+			}
         }
         else
             return false;
     }
-#ifdef PARALLEL_LOAD_SPEEDUP
-	}
-	else
-	{
-	    std::map<Position, size_t> globPosMap;
-
-	    for(int i = 0; i < numFiles; ++i){
-            string serialFile;
-            inParallel >> serialFile;
-            string tfilename = path + serialFile;
-            AlgebraicVector tmpAv;
-            if(LoadAlgebraicVector(tmpAv, tfilename.c_str())){
-                if(makeConsistent)
-                    av.add_vector(tmpAv, globPosMap);
-                else
-                    av.unite_with_vector(tmpAv, globPosMap);
-            }
-            else
-                return false;
-	    }
-	}
-#endif
 
 	return true;
 }
