@@ -751,6 +751,23 @@ bool SaveHistogramToUGX(const AlgebraicVector& av, const char* filename,
 }
 
 
+void PrintInfo(const AlgebraicVector& av)
+{
+	const int numComps = av.max_component_index() + 1;
+
+	vector<size_t>	numEntriesPerComp(numComps, 0);
+	for(size_t i = 0; i < av.positions.size(); ++i){
+		const Position& p = av.positions[i];
+		++numEntriesPerComp[p.ci];
+	}
+
+	cout << "Entries per component:" << endl;
+	for(int i = 0; i < numComps; ++i)
+		cout << "  [" << i << "]: " << numEntriesPerComp[i] << endl;
+}
+
+
+
 int main(int argc, char** argv)
 {
 	int		defHistoSecs = 5;
@@ -760,6 +777,7 @@ int main(int argc, char** argv)
 	int		histoSecs		= defHistoSecs;
 	bool	histoAbs		= false;
 	bool	histoLog		= false;
+	bool	verbose			= false;
 
 	static const int maxNumFiles = 3;
 	const char* file[maxNumFiles];
@@ -815,6 +833,10 @@ int main(int argc, char** argv)
 			++numFiles;
 		}
 
+		else if(strcmp(argv[i], "-verbose") == 0){
+			verbose = true;
+		}
+
 		else{
 			cout << "Can't interpret parameter " << argv[i] << ": Too many parameters specified." << endl;
 			return 1;
@@ -831,6 +853,10 @@ int main(int argc, char** argv)
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, component);
+			if(verbose){
+				cout << "vector properties:\n";
+				PrintInfo(av);
+			}
 			SaveAlgebraicVector(av, file[1]);
 		}
 		else if(command.find("dif") == 0){
@@ -838,7 +864,21 @@ int main(int argc, char** argv)
 			AlgebraicVector av1, av2;
 			LoadVector(av1, file[0], makeCons, component);
 			LoadVector(av2, file[1], makeCons, component);
+			
+			if(verbose){
+				cout << "Properties of v1:\n";
+				PrintInfo(av1);
+				cout << "Properties of v2:\n";
+				PrintInfo(av1);
+			}
+			
 			av1.subtract_vector(av2);
+
+			if(verbose){
+				cout << "Properties of v1-v2:\n";
+				PrintInfo(av1);
+			}
+
 			SaveAlgebraicVector(av1, file[2]);
 			PrintMinMax(av1);
 		}
@@ -846,13 +886,27 @@ int main(int argc, char** argv)
 			CHECK(numFiles == 1, "An in-file has to be specified.");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, component);
+			if(verbose){
+				cout << "vector properties:\n";
+				PrintInfo(av);
+			}
 			PrintMinMax(av);
 		}
 		else if(command.find("histogram") == 0){
 			CHECK(numFiles == 2, "An in-file and an out-file have to be specified");
 			AlgebraicVector av;
 			LoadVector(av, file[0], makeCons, component);
+			if(verbose){
+				cout << "vector properties:\n";
+				PrintInfo(av);
+			}
 			SaveHistogramToUGX(av, file[1], histoSecs, histoAbs, histoLog);
+		}
+		else if(command.find("info") == 0){
+			CHECK(numFiles == 1, "An in-file has to be specified");
+			AlgebraicVector av;
+			LoadVector(av, file[0], makeCons, component);
+			PrintInfo(av);
 		}
 		else{
 			cout << "vecutil - (c) 2013-2017 Sebastian Reiter, G-CSC Frankfurt" << endl;
@@ -863,7 +917,7 @@ int main(int argc, char** argv)
 			cout << "SAMPLE: vecutil dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
 
 			cout << "COMMANDS:" << endl;
-			
+
 			cout << "  process:   Loads a vector, processes it, and saves it to the specified file." << endl;
 			cout << "             If the vector is parallel, it will combine it to a serial one before saving." << endl;
 			cout << "             The default storage type assumed is 'additive'. If the provided vector has" << endl;
@@ -884,6 +938,8 @@ int main(int argc, char** argv)
 			cout << "             the result to a .ugx file." << endl;
 			cout << "             2 Files required - 1: in-files, 2: out-file ('.ugx')" << endl << endl;
 
+			cout << "  info:      Prints Information on the number of entries, components, etc." << endl << endl;
+
 
 			cout << "OPTIONS:" << endl;
 
@@ -898,8 +954,11 @@ int main(int argc, char** argv)
 			cout << "                    default is "<< defHistoSecs << endl << endl;
 
 			cout << "  -histoAbs:        If specified, histogram command will operate on absolute values." << endl << endl;
-			cout << "  -histoLog:        If specified, histogram command will use sections on a logarithmic scale" << endl
-				 << "                    (this implies -histoAbs)." << endl << endl;
+
+			cout << "  -histoLog:        If specified, histogram command will use sections on a logarithmic scale" << endl;
+			cout << "                    (this implies -histoAbs)." << endl << endl;
+
+			cout << "  -verbose:         If specified, additional information is printed for each processed vector." << endl << endl;
 		}
 	}
 	catch(...){
