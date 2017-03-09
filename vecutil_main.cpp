@@ -826,10 +826,6 @@ int main(int argc, char** argv)
 			++numFiles;
 		}
 
-		else if(strcmp(argv[i], "-verbose") == 0){
-			verbose = true;
-		}
-
 		else{
 			cout << "Can't interpret parameter " << argv[i] << ": Too many parameters specified." << endl;
 			return 1;
