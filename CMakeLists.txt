@@ -9,8 +9,8 @@ project(vecutil)
 set(sources	vecutil_main.cpp)
 
 option(ParallelLoadSpeedup "Build with speedup for parallel input vectors" OFF)
-message(STATUS "ParallelLoadSpeedup: " ${ParallelLoadSpeedup} " (options are: ON, OFF)")
-if (${ParallelLoadSpeedup} STREQUAL "ON")
+message(STATUS "      ParallelLoadSpeedup: " ${ParallelLoadSpeedup} " (options are: ON, OFF)")
+if (${ParallelLoadSpeedup})
 	add_definitions(-DPARALLEL_LOAD_SPEEDUP)
 endif()	
 

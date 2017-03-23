@@ -3,7 +3,14 @@ If you use it you may have to invest a little debugging for your special case.
 
 
 BUILDING:
-From the source directory:
+As part of UG4 (e.g. after installing vecutil through 'ughub install vecutil'):
+Go to your ug4 build directory and execute:
+	'cmake -Dvecutil=ON .''
+	'make'
+The resulting vecutil executable will be written to ug4/bin
+
+
+From the source directory as standalone application:
 - create a 'build' directory:
 	'mkdir build'
 - call cmake from that directory:
@@ -16,7 +23,7 @@ From the source directory:
 
 
 DEBUGGING:
-To create a debug build, proceed as above use
-	'cmake -DCMAKE_BUILD_TYPE=Debug ..'
+To create a debug build, proceed as above and use
+	'cmake -DCMAKE_BUILD_TYPE=Debug .'
 instead of
-	'cmake -DCMAKE_BUILD_TYPE=Release ..'
+	'cmake -DCMAKE_BUILD_TYPE=Release .'

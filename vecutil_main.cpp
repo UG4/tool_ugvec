@@ -1,5 +1,10 @@
-//	created by Sebastian Reiter
-//	s.b.reiter@gmail.com
+// This file is part of vecutil, a C++ library for analysing and comparing sparse matrices
+//
+// Copyright (C) 2016,2017 Sebastian Reiter, G-CSC Frankfurt <sreiter@gcsc.uni-frankfurt.de>
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
 #include <iostream>
