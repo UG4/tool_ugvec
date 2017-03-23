@@ -1,8 +1,15 @@
-vecutil is a simple tool to compare vectors written in UG4's .vec format.
-If you use it you may have to invest a little debugging for your special case.
+# vecutil #
+
+**vecutil** is a simple tool to compare and analyse vectors written in ug4's .vec format.
+
+## INSTALLATION: ##
+Install vecutil with ug4's package manager [ughub](https://github.com/UG4/ughub).:
+	'ughub install vecutil'
+
+Or simply clone this repository to any place on your harddrive.
 
 
-BUILDING:
+## BUILDING: ##
 As part of UG4 (e.g. after installing vecutil through 'ughub install vecutil'):
 Go to your ug4 build directory and execute:
 	'cmake -Dvecutil=ON .''
