@@ -11,7 +11,7 @@ Or simply clone this repository to any place on your harddrive.
 
 
 ## BUILDING: ##
-### As part of UG4 (e.g. after installing ugvec through 'ughub install ugvec'):###
+### As part of UG4 (e.g. after installing ugvec through 'ughub install ugvec'): ###
 Go to your ug4 build directory and execute:
 
 	cmake -Dugvec=ON .
