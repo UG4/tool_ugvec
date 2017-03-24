@@ -1,23 +1,23 @@
-# vecutil #
+# ugvec #
 
-**vecutil** is a simple tool to compare and analyse vectors written in ug4's .vec format.
+**ugvec** is a program to compare and analyse vectors written in ug4's .vec format.
 
 ## INSTALLATION: ##
-Install vecutil with ug4's package manager [ughub](https://github.com/UG4/ughub).:
-	'ughub install vecutil'
+Install ugvec with ug4's package manager [ughub](https://github.com/UG4/ughub).:
+	'ughub install ugvec'
 
 Or simply clone this repository to any place on your harddrive.
 
 
 ## BUILDING: ##
-As part of UG4 (e.g. after installing vecutil through 'ughub install vecutil'):
+### As part of UG4 (e.g. after installing ugvec through 'ughub install ugvec'):###
 Go to your ug4 build directory and execute:
-	'cmake -Dvecutil=ON .''
+	'cmake -Dugvec=ON .''
 	'make'
-The resulting vecutil executable will be written to ug4/bin
+The resulting ugvec executable will be written to ug4/bin
 
 
-From the source directory as standalone application:
+### From the source directory as standalone application: ###
 - create a 'build' directory:
 	'mkdir build'
 - call cmake from that directory:

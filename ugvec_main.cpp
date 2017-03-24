@@ -1,4 +1,4 @@
-// This file is part of vecutil, a C++ library for analysing and comparing vectors
+// This file is part of ugvec, a program for analysing and comparing vectors
 //
 // Copyright (C) 2016,2017 Sebastian Reiter, G-CSC Frankfurt <sreiter@gcsc.uni-frankfurt.de>
 //
@@ -903,12 +903,12 @@ int main(int argc, char** argv)
 			PrintInfo(av);
 		}
 		else{
-			cout << "vecutil - (c) 2013-2017 Sebastian Reiter, G-CSC Frankfurt" << endl;
+			cout << "ugvec - (c) 2013-2017 Sebastian Reiter, G-CSC Frankfurt" << endl;
 			cout << endl;
-			cout << "USAGE: vecutil command [options] [files]" << endl;
-			cout << "OR:    vecutil command [files] [options]" << endl << endl;
+			cout << "USAGE: ugvec command [options] [files]" << endl;
+			cout << "OR:    ugvec command [files] [options]" << endl << endl;
 
-			cout << "SAMPLE: vecutil dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
+			cout << "SAMPLE: ugvec dif -consistent vec1.vec vec2.pvec dif.vec" << endl << endl;
 
 			cout << "COMMANDS:" << endl;
 
