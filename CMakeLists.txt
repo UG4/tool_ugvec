@@ -10,7 +10,9 @@ cmake_minimum_required(VERSION 2.6)
 project(ugvec)
 
 set(sources	algebraic_vector.cpp
-    		ugvec_main.cpp)
+    		file_io.cpp
+    		ugvec_main.cpp
+    		vec_tools.cpp)
 
 option(ParallelLoadSpeedup "Build with speedup for parallel input vectors" ON)
 message(STATUS "      ParallelLoadSpeedup: " ${ParallelLoadSpeedup} " (options are: ON, OFF)")
