@@ -1,2 +1,7 @@
 Think about adding an '-abs' parameter, which will convert all vectors to
 absolute values during load. This may replace the Histogram -abs parameter.
+
+Performance and memory improvements:
+- Currently position-data is duplicated for each component. This made support
+  for multiple components in the .vec format easy. Would be a good idea to
+  implement a more efficient way...

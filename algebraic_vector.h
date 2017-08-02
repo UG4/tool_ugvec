@@ -48,7 +48,16 @@ struct Position{
 		return false;
 	}
 	
-	number x, y, z;
+	union {
+		struct {
+			number x;
+			number y;
+			number z;
+		};
+
+		number coord[3];
+	};
+	
 	int ci;			///< component index
 };
 
@@ -81,6 +90,8 @@ struct AlgebraicVector{
 /** \return The highest component index in positions. -1 if positions is empty.*/
 	int max_component_index() const;
 
+	void swap (AlgebraicVector& av);
+	
 	int	worldDim;
 	std::vector<Position>	positions;
 	std::vector<number>		data;

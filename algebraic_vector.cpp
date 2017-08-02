@@ -207,3 +207,11 @@ max_component_index() const
 		maxCI = max(maxCI, positions[i].ci);
 	return maxCI;
 }
+
+void AlgebraicVector::
+swap (AlgebraicVector& av)
+{
+    std::swap (worldDim, av.worldDim);
+    positions.swap (av.positions);
+    data.swap (av.data);
+}

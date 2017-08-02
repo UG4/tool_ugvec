@@ -10,7 +10,10 @@ cmake_minimum_required(VERSION 2.6)
 project(ugvec)
 
 set(sources	algebraic_vector.cpp
+    		base64.cpp
     		file_io.cpp
+    		file_io_vec.cpp
+    		file_io_vtu.cpp
     		ugvec_main.cpp
     		vec_tools.cpp)
 
