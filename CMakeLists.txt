@@ -9,13 +9,13 @@
 cmake_minimum_required(VERSION 2.6)
 project(ugvec)
 
-set(sources	algebraic_vector.cpp
-    		base64.cpp
-    		file_io.cpp
-    		file_io_vec.cpp
-    		file_io_vtu.cpp
-    		ugvec_main.cpp
-    		vec_tools.cpp)
+set(sources	external/base64.cpp
+    		src/algebraic_vector.cpp
+    		src/file_io.cpp
+    		src/file_io_vec.cpp
+    		src/file_io_vtu.cpp
+    		src/ugvec_main.cpp
+    		src/vec_tools.cpp)
 
 option(ParallelLoadSpeedup "Build with speedup for parallel input vectors" ON)
 message(STATUS "      ParallelLoadSpeedup: " ${ParallelLoadSpeedup} " (options are: ON, OFF)")
@@ -23,5 +23,6 @@ if (${ParallelLoadSpeedup})
 	add_definitions(-DPARALLEL_LOAD_SPEEDUP)
 endif()	
 
+include_directories(external)
 add_executable(ugvec ${sources})
 install(TARGETS ugvec RUNTIME DESTINATION "bin")
